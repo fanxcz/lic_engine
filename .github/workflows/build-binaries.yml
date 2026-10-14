@@ -46,6 +46,11 @@ jobs:
           Copy-Item "build/Release/lic_editor.exe" "$package/lic_editor.exe"
           if (-not (Test-Path "build/Release/voidbound.exe")) { throw "Missing standalone Voidbound game executable." }
           Copy-Item "build/Release/voidbound.exe" "$package/voidbound.exe"
+          if (-not (Test-Path "build/Release/nexus.exe")) { throw "Missing bundled NEXUS language compiler." }
+          Copy-Item "build/Release/nexus.exe" "$package/nexus.exe"
+          Copy-Item "build/Release/runtime" "$package/runtime" -Recurse -Force
+          Copy-Item "build/Release/stdlib" "$package/stdlib" -Recurse -Force
+          Copy-Item "build/Release/NEXUS-LICENSE" "$package/NEXUS-LICENSE" -Force
           foreach ($shader in @("viewport.vert.spv", "viewport.frag.spv")) {
             if (-not (Test-Path "build/Release/shaders/$shader")) { throw "Missing compiled Vulkan shader: $shader" }
           }
@@ -109,6 +114,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "The packaged editor failed its version smoke test." }
           & "$package/voidbound.exe" --version
           if ($LASTEXITCODE -ne 0) { throw "The packaged game failed its version smoke test." }
+          & "$package/nexus.exe" --version
+          if ($LASTEXITCODE -ne 0) { throw "The bundled NEXUS compiler failed its version smoke test." }
+          & "$package/nexus.exe" check "examples/nexus/GameRules.nx"
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Compress-Archive -Path "$package/*" -DestinationPath "dist/lic-engine-windows-x64.zip" -Force
 
@@ -154,6 +162,11 @@ jobs:
           cp -R build/shaders "$package/shaders"
           cp README.md "$package/README.md"
           cp docs/BUILDING.md "$package/BUILDING.md"
+          install -m 0755 build/nexus "$package/nexus"
+          mkdir -p "$package/runtime"
+          install -m 0644 build/runtime/runtime.cpp "$package/runtime/runtime.cpp"
+          cp -R build/stdlib "$package/stdlib"
+          cp build/NEXUS-LICENSE "$package/NEXUS-LICENSE"
           cat > "$package/run-lic-engine.sh" <<'EOF'
           #!/usr/bin/env sh
           set -eu
@@ -170,6 +183,8 @@ jobs:
           chmod +x "$package/run-voidbound.sh"
           "$package/lic_editor" --version
           "$package/voidbound" --version
+          "$package/nexus" --version
+          "$package/nexus" check "$GITHUB_WORKSPACE/examples/nexus/GameRules.nx"
           tar -C dist -czf dist/lic-engine-linux-x64.tar.gz lic-engine-linux-x64
 
       - uses: actions/upload-artifact@v4
@@ -200,6 +215,11 @@ jobs:
           package="dist/lic-engine-macos-arm64-core"
           mkdir -p "$package"
           install -m 0755 build/lic_editor "$package/lic_editor"
+          install -m 0755 build/nexus "$package/nexus"
+          mkdir -p "$package/runtime"
+          install -m 0644 build/runtime/runtime.cpp "$package/runtime/runtime.cpp"
+          cp -R build/stdlib "$package/stdlib"
+          cp build/NEXUS-LICENSE "$package/NEXUS-LICENSE"
           cp README.md "$package/README.md"
           cp docs/BUILDING.md "$package/BUILDING.md"
           cat > "$package/run-lic-engine.sh" <<'EOF'
@@ -210,6 +230,7 @@ jobs:
           EOF
           chmod +x "$package/run-lic-engine.sh"
           "$package/lic_editor" --version
+          "$package/nexus" --version
           tar -C dist -czf dist/lic-engine-macos-arm64-core.tar.gz lic-engine-macos-arm64-core
 
       - uses: actions/upload-artifact@v4

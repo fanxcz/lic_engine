@@ -1,0 +1,7 @@
+fn main() {
+    print("LICCFG_PLAYER_HEALTH=100")
+    print("LICCFG_PLAYER_SPEED=230")
+    print("LICCFG_ENEMY_SPEED=68")
+    print("LICCFG_FIRE_INTERVAL_MS=240")
+    print("LICCFG_DASH_COOLDOWN_MS=1350")
+}

@@ -68,6 +68,12 @@ if ($enableVulkan) {
     if (-not (Test-Path $gameExecutable)) { throw "Expected Voidbound executable was not produced: $gameExecutable" }
     Copy-Item $gameExecutable (Join-Path $packageDir "voidbound.exe") -Force
 }
+$nexusExecutable = Join-Path $buildDir "$Configuration/nexus.exe"
+if (-not (Test-Path $nexusExecutable)) { throw "Expected NEXUS compiler was not produced: $nexusExecutable" }
+Copy-Item $nexusExecutable (Join-Path $packageDir "nexus.exe") -Force
+Copy-Item (Join-Path $buildDir "$Configuration/runtime") (Join-Path $packageDir "runtime") -Recurse -Force
+Copy-Item (Join-Path $buildDir "$Configuration/stdlib") (Join-Path $packageDir "stdlib") -Recurse -Force
+Copy-Item (Join-Path $buildDir "$Configuration/NEXUS-LICENSE") (Join-Path $packageDir "NEXUS-LICENSE") -Force
 $shaderDir = Join-Path (Split-Path $executable -Parent) "shaders"
 if ($enableVulkan) {
     foreach ($shader in @("viewport.vert.spv", "viewport.frag.spv")) {
@@ -139,6 +145,8 @@ Copy-Item (Join-Path $repoRoot "docs/BUILDING.md") (Join-Path $packageDir "BUILD
 Write-Host ([Environment]::NewLine + "[4/4] Checking executable and packing ZIP...") -ForegroundColor Cyan
 & $executable --version
 if ($LASTEXITCODE -ne 0) { throw "The generated executable failed its --version smoke test." }
+& $nexusExecutable --version
+if ($LASTEXITCODE -ne 0) { throw "Bundled NEXUS compiler failed its --version smoke test." }
 Compress-Archive -Path (Join-Path $packageDir "*") -DestinationPath $archive -Force
 
 Write-Host ([Environment]::NewLine + "Build complete.") -ForegroundColor Green

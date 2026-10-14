@@ -245,6 +245,19 @@ if(BUILD_TESTING AND LIC_ENGINE_BUILD_TESTS)
     if(TARGET lic_nexus)
         add_test(NAME lic_nexus_version COMMAND lic_nexus --version)
         set_tests_properties(lic_nexus_version PROPERTIES PASS_REGULAR_EXPRESSION "Nexus 1.1.0")
+        add_test(NAME lic_nexus_rules_check
+            COMMAND lic_nexus check "${CMAKE_CURRENT_SOURCE_DIR}/examples/nexus/GameRules.nx")
+        if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
+            set(LIC_NEXUS_RULES_SMOKE "${CMAKE_CURRENT_BINARY_DIR}/nexus-game-rules-smoke${CMAKE_EXECUTABLE_SUFFIX}")
+            add_test(NAME lic_nexus_rules_build
+                COMMAND lic_nexus build
+                    "${CMAKE_CURRENT_SOURCE_DIR}/examples/nexus/GameRules.nx"
+                    -o "${LIC_NEXUS_RULES_SMOKE}" --backend native)
+            add_test(NAME lic_nexus_rules_run COMMAND "${LIC_NEXUS_RULES_SMOKE}")
+            set_tests_properties(lic_nexus_rules_run PROPERTIES
+                DEPENDS lic_nexus_rules_build
+                PASS_REGULAR_EXPRESSION "LICCFG_PLAYER_HEALTH=100")
+        endif()
     endif()
     add_executable(lic_core_tests tests/core_tests.cpp)
     target_link_libraries(lic_core_tests PRIVATE LIC::Core LIC::World LIC::Game lic_build_options)
