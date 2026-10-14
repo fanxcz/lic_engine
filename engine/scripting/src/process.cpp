@@ -2,6 +2,7 @@
 
 #include <cerrno>
 #include <fstream>
+#include <iterator>
 #include <sstream>
 #include <system_error>
 #include <utility>

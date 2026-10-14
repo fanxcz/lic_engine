@@ -14,6 +14,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <system_error>
