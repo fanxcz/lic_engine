@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -133,18 +134,28 @@ void EditorUi::initialize_platform(GLFWwindow* window) {
     window_ = window;
     std::filesystem::create_directories(project_root_ / "Scenes");
     std::filesystem::create_directories(project_root_ / "Assets");
+    std::filesystem::create_directories(project_root_ / "Assets" / "Materials");
     std::filesystem::create_directories(script_path_.parent_path());
     std::filesystem::create_directories(nexus_rules_binary_.parent_path());
+    seed_material_library();
+    load_project_materials();
     if (!std::filesystem::exists(script_path_)) {
-        std::ofstream sample(script_path_, std::ios::binary | std::ios::trunc);
-        sample << "fn main() {\n"
-                  "    // These values are read by LIC Engine when a run starts.\n"
-                  "    print(\"LICCFG_PLAYER_HEALTH=100\")\n"
-                  "    print(\"LICCFG_PLAYER_SPEED=230\")\n"
-                  "    print(\"LICCFG_ENEMY_SPEED=68\")\n"
-                  "    print(\"LICCFG_FIRE_INTERVAL_MS=240\")\n"
-                  "    print(\"LICCFG_DASH_COOLDOWN_MS=1350\")\n"
-                  "}\n";
+        const auto bundledScript = executable_directory_ / "assets" / "scripts" / "GameRules.nx";
+        std::error_code copyError;
+        if (std::filesystem::is_regular_file(bundledScript, copyError)) {
+            std::filesystem::copy_file(bundledScript, script_path_,
+                                       std::filesystem::copy_options::skip_existing, copyError);
+        }
+        if (copyError || !std::filesystem::exists(script_path_)) {
+            std::ofstream sample(script_path_, std::ios::binary | std::ios::trunc);
+            sample << "fn main() {\n"
+                      "    print(\"LICCFG_PLAYER_HEALTH=100\")\n"
+                      "    print(\"LICCFG_PLAYER_SPEED=230\")\n"
+                      "    print(\"LICCFG_ENEMY_SPEED=68\")\n"
+                      "    print(\"LICCFG_FIRE_INTERVAL_MS=240\")\n"
+                      "    print(\"LICCFG_DASH_COOLDOWN_MS=1350\")\n"
+                      "}\n";
+        }
     }
     load_nexus_script();
 
@@ -457,6 +468,7 @@ void EditorUi::build_frame(float delta_seconds) {
                                glfwGetMouseButton(window_, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) ||
                               glfwGetKey(window_, GLFW_KEY_SPACE) == GLFW_PRESS;
             game_.update(delta_seconds_, input);
+            apply_project_materials();
         }
 
         // Do not create a fullscreen SceneCanvas window behind the game HUD.
@@ -941,7 +953,29 @@ void parse_nexus_settings(const std::string& output, lic::game::ScriptSettings& 
                parse_setting_value(line, "LICCFG_PLAYER_SPEED", settings.player_speed) ||
                parse_setting_value(line, "LICCFG_ENEMY_SPEED", settings.enemy_speed) ||
                parse_setting_value(line, "LICCFG_FIRE_INTERVAL_MS", settings.fire_interval_ms) ||
-               parse_setting_value(line, "LICCFG_DASH_COOLDOWN_MS", settings.dash_cooldown_ms));
+               parse_setting_value(line, "LICCFG_DASH_COOLDOWN_MS", settings.dash_cooldown_ms) ||
+               parse_setting_value(line, "LICCFG_ENEMY_SPAWN_BASE", settings.enemy_spawn_base) ||
+               parse_setting_value(line, "LICCFG_ENEMY_SPAWN_PER_WAVE", settings.enemy_spawn_per_wave) ||
+               parse_setting_value(line, "LICCFG_ENEMY_SPAWN_CAP", settings.enemy_spawn_cap) ||
+               parse_setting_value(line, "LICCFG_ENEMY_HEALTH_BASE", settings.enemy_health_base) ||
+               parse_setting_value(line, "LICCFG_ENEMY_HEALTH_PER_WAVE", settings.enemy_health_per_wave) ||
+               parse_setting_value(line, "LICCFG_ELITE_HEALTH_BONUS", settings.elite_health_bonus) ||
+               parse_setting_value(line, "LICCFG_ELITE_START_WAVE", settings.elite_start_wave) ||
+               parse_setting_value(line, "LICCFG_ELITE_EVERY_N", settings.elite_every_n) ||
+               parse_setting_value(line, "LICCFG_SCORE_PER_REWARD", settings.score_per_reward) ||
+               parse_setting_value(line, "LICCFG_EXPERIENCE_INITIAL_THRESHOLD", settings.experience_initial_threshold) ||
+               parse_setting_value(line, "LICCFG_EXPERIENCE_THRESHOLD_BASE", settings.experience_threshold_base) ||
+               parse_setting_value(line, "LICCFG_EXPERIENCE_THRESHOLD_PER_LEVEL", settings.experience_threshold_per_level) ||
+               parse_setting_value(line, "LICCFG_EXPERIENCE_PICKUP_LIFETIME_SECONDS", settings.experience_pickup_lifetime_seconds) ||
+               parse_setting_value(line, "LICCFG_SPAWN_INTERVAL_BASE_MS", settings.spawn_interval_base_ms) ||
+               parse_setting_value(line, "LICCFG_SPAWN_INTERVAL_WAVE_REDUCTION_MS", settings.spawn_interval_wave_reduction_ms) ||
+               parse_setting_value(line, "LICCFG_SPAWN_INTERVAL_MIN_MS", settings.spawn_interval_min_ms) ||
+               parse_setting_value(line, "LICCFG_RAPID_FIRE_INTERVAL_PERCENT", settings.rapid_fire_interval_percent) ||
+               parse_setting_value(line, "LICCFG_HEAVY_ROUND_DAMAGE", settings.heavy_round_damage) ||
+               parse_setting_value(line, "LICCFG_VITALITY_HEALTH_BONUS", settings.vitality_health_bonus) ||
+               parse_setting_value(line, "LICCFG_VITALITY_HEAL_AMOUNT", settings.vitality_heal_amount) ||
+               parse_setting_value(line, "LICCFG_MOBILITY_SPEED_BONUS", settings.mobility_speed_bonus) ||
+               parse_setting_value(line, "LICCFG_MOBILITY_DASH_COOLDOWN_MS", settings.mobility_dash_cooldown_ms));
     }
 }
 
@@ -1039,9 +1073,9 @@ void EditorUi::execute_nexus_action(int action) {
     lic::game::ScriptSettings settings{};
     parse_nexus_settings(runResult.output, settings);
     game_.apply_script_settings(settings);
-    nexus_status_ = "Rules loaded: HP " + std::to_string(settings.player_health) +
-        ", speed " + std::to_string(settings.player_speed) + "/100, enemy " +
-        std::to_string(settings.enemy_speed) + "/100";
+    nexus_status_ = "NEXUS rules loaded: HP " + std::to_string(settings.player_health) +
+        ", speed " + std::to_string(settings.player_speed) + "/100, enemies " +
+        std::to_string(settings.enemy_spawn_cap) + " max per wave";
     log(nexus_status_);
 }
 
@@ -1052,7 +1086,8 @@ void EditorUi::apply_nexus_game_rules() {
 void EditorUi::start_game_run() {
     apply_nexus_game_rules();
     game_.start_run();
-    if (nexus_status_.find("Rules loaded:") == std::string::npos) {
+    apply_project_materials();
+    if (nexus_status_.find("NEXUS rules loaded:") == std::string::npos) {
         log("Started with built-in game defaults because the NEXUS rules script did not load");
     }
 }
