@@ -5,6 +5,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$githubRepo = "fanxcz/lic_engine"
 $gh = Get-Command gh -ErrorAction SilentlyContinue
 if (-not $gh) {
     throw "GitHub CLI (gh) was not found. Install it from https://cli.github.com/ and reopen PowerShell."
@@ -18,7 +19,7 @@ try {
     }
 
     $previousRunId = $null
-    $previousRaw = & gh run list --workflow build-binaries.yml --branch $Ref --event workflow_dispatch --limit 1 --json databaseId
+    $previousRaw = & gh run list --repo $githubRepo --workflow build-binaries.yml --branch $Ref --event workflow_dispatch --limit 1 --json databaseId
     if ($LASTEXITCODE -eq 0) {
         $previousRuns = @($previousRaw | ConvertFrom-Json)
         if ($previousRuns.Count -gt 0 -and $previousRuns[0].databaseId) {
@@ -27,7 +28,7 @@ try {
     }
 
     Write-Host "Starting Windows/Linux/macOS builds on GitHub Actions for ref '$Ref'..." -ForegroundColor Cyan
-    & gh workflow run build-binaries.yml --ref $Ref
+    & gh workflow run build-binaries.yml --repo $githubRepo --ref $Ref
     if ($LASTEXITCODE -ne 0) {
         throw "Could not start the workflow. Ensure the workflow has been pushed to GitHub and Actions are enabled."
     }
@@ -35,7 +36,7 @@ try {
     $runId = $null
     for ($attempt = 0; $attempt -lt 18; $attempt++) {
         Start-Sleep -Seconds 5
-        $raw = & gh run list --workflow build-binaries.yml --branch $Ref --event workflow_dispatch --limit 1 --json databaseId,status,conclusion
+        $raw = & gh run list --repo $githubRepo --workflow build-binaries.yml --branch $Ref --event workflow_dispatch --limit 1 --json databaseId,status,conclusion
         if ($LASTEXITCODE -ne 0) {
             throw "Failed to query GitHub Actions runs."
         }
@@ -54,18 +55,18 @@ try {
     }
 
     Write-Host "Watching workflow run $runId. The script will stop if a platform build fails." -ForegroundColor Cyan
-    & gh run watch $runId --exit-status
+    & gh run watch $runId --repo $githubRepo --exit-status
     if ($LASTEXITCODE -ne 0) {
-        throw "At least one platform build failed. Inspect the run with: gh run view $runId --web"
+        throw "At least one platform build failed. Inspect the run with: gh run view $runId --repo $githubRepo --web"
     }
 
     $downloadRoot = Join-Path $repoRoot "dist/platform-builds"
     if (Test-Path $downloadRoot) { Remove-Item $downloadRoot -Recurse -Force }
     New-Item -ItemType Directory -Force -Path $downloadRoot | Out-Null
 
-    & gh run download $runId --dir $downloadRoot
+    & gh run download $runId --repo $githubRepo --dir $downloadRoot
     if ($LASTEXITCODE -ne 0) {
-        throw "The workflow completed, but artifact download failed. Try: gh run download $runId --dir dist/platform-builds"
+        throw "The workflow completed, but artifact download failed. Try: gh run download $runId --repo $githubRepo --dir dist/platform-builds"
     }
 
     $expected = @(
