@@ -7,10 +7,48 @@ LIC Engine can be built in two modes:
 
 ## Requirements
 
+- **Windows 11 local builds:** Visual Studio 2022 with the *Desktop development with C++* workload, CMake 3.25+, and Git. The Vulkan viewport additionally requires the LunarG Vulkan SDK.
+- **Cross-platform build downloads:** install GitHub CLI (`gh`) and authenticate once with `gh auth login`. GitHub Actions builds for other operating systems on their native runners; Windows cannot produce a genuine macOS binary by compiling locally.
+
 - CMake 3.25 or newer
 - A C++23 compiler (MSVC 2022, GCC 13+, or Clang 16+ recommended)
 - For the viewport: Vulkan SDK or system Vulkan development headers/loader, GLFW 3 development files, and the `glslc` shader compiler
 - A desktop session and Vulkan-capable driver to run the viewport
+
+## Windows 11: build the local executable
+
+Open PowerShell in the repository root. The script configures a clean x64 build, compiles, runs CTest, checks the executable version, and creates a ZIP package:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\tools\build-windows.ps1
+```
+
+If the Vulkan SDK and its `glslc.exe` are not installed, the script still builds the core CLI executable and warns that the 3D viewport is disabled. To explicitly request a core-only build:
+
+```powershell
+.\tools\build-windows.ps1 -CoreOnly
+```
+
+Output: `dist\lic-engine-windows-x64.zip` and `dist\lic-engine-windows-x64\lic_editor.exe`. For a graphical viewport, install the [LunarG Vulkan SDK](https://vulkan.lunarg.com/sdk/home), reopen PowerShell so `VULKAN_SDK` is available, and run the script again. GLFW 3.4 is fetched by CMake only when the Vulkan SDK is detected.
+
+## Windows 11: build and download all platform packages
+
+Push the repository changes to GitHub first. Then, from the repository root, run:
+
+```powershell
+gh auth login
+.\tools\build-all-platforms.ps1
+```
+
+The script dispatches the **Build platform binaries** workflow, waits for it to finish, and downloads its packages into `dist\platform-builds\`. Packages are also available on the repository's **Actions** page for 30 days after each run. Pushing a version tag such as `v0.1.0` creates a GitHub Release with the generated archives attached.
+
+Current package scope:
+- `lic-engine-windows-x64.zip`: Windows x64 executable; the workflow builds the Vulkan viewport and includes its SPIR-V shaders.
+- `lic-engine-linux-x64.tar.gz`: Linux x64 executable with the Vulkan viewport and shaders.
+- `lic-engine-macos-arm64-core.tar.gz`: Apple Silicon macOS core CLI executable only. The desktop Vulkan path has not been validated for macOS yet.
+
+Android APKs and Web/WASM builds are **not available yet**: the engine does not have an Android activity/platform layer or a Web renderer target. Those need real platform backends; producing an empty APK or an unrelated Web stub would not be a usable engine build.
 
 ### Debian / Ubuntu
 
