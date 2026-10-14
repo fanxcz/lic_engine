@@ -52,6 +52,9 @@ if(LIC_ENGINE_ENABLE_VULKAN)
         set(GLFW_BUILD_TESTS OFF CACHE BOOL "Disable GLFW test builds" FORCE)
         set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "Disable GLFW example builds" FORCE)
         set(GLFW_INSTALL OFF CACHE BOOL "Do not install GLFW from the nested build" FORCE)
+        # Linux CI builds use GLFW X11 here so configuration does not require wayland-scanner.
+        set(GLFW_BUILD_WAYLAND OFF CACHE BOOL "Disable Wayland backend in fetched GLFW build" FORCE)
+        set(GLFW_BUILD_X11 ON CACHE BOOL "Enable X11 backend in fetched GLFW build" FORCE)
         set(BUILD_SHARED_LIBS OFF)
         FetchContent_Declare(
             glfw
