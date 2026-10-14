@@ -72,7 +72,9 @@ if ($enableVulkan) {
     }
 }
 if (Test-Path $shaderDir) {
-    Copy-Item $shaderDir (Join-Path $packageDir "shaders") -Recurse -Force
+    $packageShaders = Join-Path $packageDir "shaders"
+    New-Item -ItemType Directory -Force -Path $packageShaders | Out-Null
+    Copy-Item (Join-Path $shaderDir "*") $packageShaders -Recurse -Force
 }
 if ($enableVulkan -and $vulkanSdk) {
     $vulkanLoader = Join-Path $vulkanSdk "Runtime/x64/vulkan-1.dll"
