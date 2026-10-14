@@ -4,7 +4,7 @@
 
 LIC Engine aims to combine the approachable scene workflow of Godot, the level-design and runtime mindset of Source, and the rendering ambition of Unreal—without copying their interfaces or architecture.
 
-> **Project status:** early foundation. The optional native Vulkan viewport opens a GLFW window, selects a Vulkan-capable device, builds a swapchain/render pass/depth buffer and draws a shader-based colored cube. The new `LIC::World` module provides generation-safe entity handles and typed sparse-set component storage, covered by automated lifecycle tests. This is not yet a full editor: imported meshes, camera controls, scene hierarchy, material editing, physics, scene serialization, and runtime packaging remain future work.
+> **Project status:** early foundation. The optional native Vulkan viewport opens a GLFW window, selects a Vulkan-capable device, builds a swapchain/render pass/depth buffer and draws a shader-based colored cube. The new `LIC::World` module provides generation-safe entity handles, typed sparse-set component storage, and mutable/const component iteration, covered by automated lifecycle tests. This is not yet a full editor: imported meshes, camera controls, scene hierarchy, material editing, physics, scene serialization, and runtime packaging remain future work.
 
 ## Download for Windows 11
 
