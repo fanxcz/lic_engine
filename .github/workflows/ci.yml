@@ -21,7 +21,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libvulkan-dev libglfw3-dev mesa-vulkan-drivers
+          sudo apt-get install -y libvulkan-dev libglfw3-dev glslc mesa-vulkan-drivers
 
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
