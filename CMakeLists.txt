@@ -8,6 +8,12 @@ option(LIC_ENGINE_WARNINGS_AS_ERRORS "Treat project warnings as errors" OFF)
 option(LIC_ENGINE_ENABLE_VULKAN "Build the native Vulkan viewport when Vulkan and glslc are available" ON)
 option(LIC_ENGINE_FETCH_GLFW "Fetch GLFW 3.4 if it is not installed and the Vulkan backend can be built" OFF)
 
+# Use the static MSVC runtime so the Windows archive does not depend on a
+# separately installed Visual C++ redistributable.
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
 add_library(lic_build_options INTERFACE)
 target_compile_features(lic_build_options INTERFACE cxx_std_23)
 set_target_properties(lic_build_options PROPERTIES CXX_EXTENSIONS OFF)
