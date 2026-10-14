@@ -64,8 +64,21 @@ $executable = Join-Path $buildDir "$Configuration/lic_editor.exe"
 if (-not (Test-Path $executable)) { throw "Expected executable was not produced: $executable" }
 Copy-Item $executable (Join-Path $packageDir "lic_editor.exe") -Force
 $shaderDir = Join-Path (Split-Path $executable -Parent) "shaders"
+if ($enableVulkan) {
+    foreach ($shader in @("viewport.vert.spv", "viewport.frag.spv")) {
+        if (-not (Test-Path (Join-Path $shaderDir $shader))) {
+            throw "Expected compiled Vulkan shader was not packaged: $(Join-Path $shaderDir $shader)"
+        }
+    }
+}
 if (Test-Path $shaderDir) {
     Copy-Item $shaderDir (Join-Path $packageDir "shaders") -Recurse -Force
+}
+if ($enableVulkan -and $vulkanSdk) {
+    $vulkanLoader = Join-Path $vulkanSdk "Runtime/x64/vulkan-1.dll"
+    if (Test-Path $vulkanLoader) {
+        Copy-Item $vulkanLoader (Join-Path $packageDir "vulkan-1.dll") -Force
+    }
 }
 Copy-Item (Join-Path $repoRoot "README.md") (Join-Path $packageDir "README.md") -Force
 Copy-Item (Join-Path $repoRoot "docs/BUILDING.md") (Join-Path $packageDir "BUILDING.md") -Force
