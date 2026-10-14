@@ -4,7 +4,7 @@
 
 LIC Engine aims to combine the approachable scene workflow of Godot, the level-design and runtime mindset of Source, and the rendering ambition of Unreal—without copying their interfaces or architecture.
 
-> **Project status:** early foundation. The native Vulkan viewport milestone now creates a GLFW window, selects a Vulkan-capable device, creates a swapchain and presents a dark clear-color frame. It is not yet a 3D scene renderer: mesh drawing, camera controls, editor panels, physics, and runtime packaging remain future work.
+> **Project status:** early foundation. The native Vulkan viewport now opens a GLFW window, selects a Vulkan-capable device, builds a swapchain/render pass/depth buffer and draws a shader-based colored cube. This is the first renderer smoke scene, not a full editor: imported meshes, camera controls, scene hierarchy, material editing, physics, and runtime packaging remain future work.
 
 ## Design principles
 
