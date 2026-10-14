@@ -1,9 +1,11 @@
 #pragma once
 
+#include <filesystem>
+
 namespace lic::renderer {
 
-// Opens the native Vulkan viewport and keeps it alive until the window closes.
+// Opens the native Vulkan viewport and locates shaders beside the executable.
 // Returns 0 on normal exit and a non-zero value if initialization or rendering fails.
-int run_vulkan_viewport();
+int run_vulkan_viewport(const std::filesystem::path& executable_path);
 
 } // namespace lic::renderer
