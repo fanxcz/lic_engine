@@ -42,7 +42,10 @@ add_library(LIC::World ALIAS lic_world)
 target_include_directories(lic_world INTERFACE engine/world/include)
 target_link_libraries(lic_world INTERFACE lic_build_options)
 
-add_library(lic_game engine/game/src/voidbound.cpp)
+add_library(lic_game
+    engine/game/src/voidbound.cpp
+    engine/game/src/voidbound_progression.cpp
+    engine/game/src/voidbound_simulation.cpp)
 add_library(LIC::Game ALIAS lic_game)
 target_include_directories(lic_game PUBLIC engine/game/include)
 target_link_libraries(lic_game PUBLIC LIC::World lic_build_options)
