@@ -34,7 +34,9 @@ This is conceptual ownership, not permission for circular includes. Shared inter
 
 ## World and object model
 
-Use an ECS-oriented world model with stable entity handles and explicit component ownership. A transform has local position, rotation, and scale; world transforms derive from the hierarchy. Define coordinate convention, handedness, angle unit, and world unit before implementing importers. Entity destruction must invalidate handles safely. Scene serialization uses stable IDs, never raw memory addresses or storage indices.
+The initial `LIC::World` module implements generation-safe entity handles, entity creation/destruction, typed component add/get/has/remove operations, and packed sparse-set storage. Destroying an entity removes its components; recycled entity indices receive a new generation so stale handles cannot access a new object. Automated tests cover duplicate components, missing components, stale handles, cleanup, index recycling, and dense-storage compaction.
+
+The next world milestone is a transform component and hierarchy, followed by versioned scene serialization. A transform has local position, rotation, and scale; world transforms derive from the hierarchy. Define coordinate convention, handedness, angle unit, and world unit before implementing importers. Scene serialization must use stable IDs, never raw memory addresses or storage indices.
 
 Do not build a universal reflection system before the first scene works. Start with explicit component metadata and serialization hooks, then expand to meet editor needs.
 
