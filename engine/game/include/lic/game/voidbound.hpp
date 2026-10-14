@@ -40,10 +40,32 @@ struct UpgradeOption final {
 // Values are emitted by a NEXUS GameRules.nx script.
 struct ScriptSettings final {
     int player_health{100};
-    int player_speed{230};          // hundredths of game units per second
-    int enemy_speed{68};            // hundredths of game units per second
+    int player_speed{230};                   // hundredths of game units per second
+    int enemy_speed{68};                     // hundredths of game units per second
     int fire_interval_ms{240};
     int dash_cooldown_ms{1350};
+    int enemy_spawn_base{4};
+    int enemy_spawn_per_wave{2};
+    int enemy_spawn_cap{28};
+    int enemy_health_base{200};              // hundredths of health
+    int enemy_health_per_wave{20};           // hundredths of health
+    int elite_health_bonus{200};             // hundredths of health
+    int elite_start_wave{3};
+    int elite_every_n{5};
+    int score_per_reward{100};
+    int experience_initial_threshold{5};
+    int experience_threshold_base{4};
+    int experience_threshold_per_level{2};
+    int spawn_interval_base_ms{950};
+    int spawn_interval_wave_reduction_ms{35};
+    int spawn_interval_min_ms{320};
+    int rapid_fire_interval_percent{75};
+    int heavy_round_damage{1};
+    int vitality_health_bonus{25};
+    int vitality_heal_amount{45};
+    int mobility_speed_bonus{28};            // hundredths of game units per second
+    int mobility_dash_cooldown_ms{350};
+    int experience_pickup_lifetime_seconds{18};
 };
 
 class Voidbound final {
@@ -89,6 +111,7 @@ private:
     int experience_{};
     int experience_to_next_{};
     int spawn_remaining_{};
+    int wave_spawn_total_{};
     int pending_upgrades_{};
     bool pending_wave_advance_{};
     float health_{};

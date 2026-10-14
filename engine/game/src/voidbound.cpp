@@ -55,6 +55,29 @@ void Voidbound::apply_script_settings(const ScriptSettings& settings) noexcept {
     settings_.enemy_speed = std::clamp(settings.enemy_speed, 20, 250);
     settings_.fire_interval_ms = std::clamp(settings.fire_interval_ms, 80, 2000);
     settings_.dash_cooldown_ms = std::clamp(settings.dash_cooldown_ms, 250, 5000);
+    settings_.enemy_spawn_base = std::clamp(settings.enemy_spawn_base, 1, 20);
+    settings_.enemy_spawn_per_wave = std::clamp(settings.enemy_spawn_per_wave, 0, 8);
+    settings_.enemy_spawn_cap = std::clamp(settings.enemy_spawn_cap, 4, 60);
+    settings_.enemy_health_base = std::clamp(settings.enemy_health_base, 50, 1500);
+    settings_.enemy_health_per_wave = std::clamp(settings.enemy_health_per_wave, 0, 300);
+    settings_.elite_health_bonus = std::clamp(settings.elite_health_bonus, 0, 1500);
+    settings_.elite_start_wave = std::clamp(settings.elite_start_wave, 1, 30);
+    settings_.elite_every_n = std::clamp(settings.elite_every_n, 1, 20);
+    settings_.score_per_reward = std::clamp(settings.score_per_reward, 1, 10000);
+    settings_.experience_initial_threshold = std::clamp(settings.experience_initial_threshold, 1, 50);
+    settings_.experience_threshold_base = std::clamp(settings.experience_threshold_base, 1, 50);
+    settings_.experience_threshold_per_level = std::clamp(settings.experience_threshold_per_level, 0, 20);
+    settings_.spawn_interval_base_ms = std::clamp(settings.spawn_interval_base_ms, 350, 3000);
+    settings_.spawn_interval_wave_reduction_ms = std::clamp(settings.spawn_interval_wave_reduction_ms, 0, 100);
+    settings_.spawn_interval_min_ms = std::clamp(settings.spawn_interval_min_ms, 200, 1000);
+    settings_.rapid_fire_interval_percent = std::clamp(settings.rapid_fire_interval_percent, 40, 95);
+    settings_.heavy_round_damage = std::clamp(settings.heavy_round_damage, 1, 10);
+    settings_.vitality_health_bonus = std::clamp(settings.vitality_health_bonus, 5, 200);
+    settings_.vitality_heal_amount = std::clamp(settings.vitality_heal_amount, 5, 250);
+    settings_.mobility_speed_bonus = std::clamp(settings.mobility_speed_bonus, 5, 200);
+    settings_.mobility_dash_cooldown_ms = std::clamp(settings.mobility_dash_cooldown_ms, 100, 2000);
+    settings_.experience_pickup_lifetime_seconds =
+        std::clamp(settings.experience_pickup_lifetime_seconds, 3, 120);
 }
 
 void Voidbound::start_run() {
@@ -65,7 +88,7 @@ void Voidbound::start_run() {
     kills_ = 0;
     level_ = 1;
     experience_ = 0;
-    experience_to_next_ = 5;
+    experience_to_next_ = settings_.experience_initial_threshold;
     pending_upgrades_ = 0;
     pending_wave_advance_ = false;
     health_ = static_cast<float>(settings_.player_health);
@@ -122,7 +145,9 @@ void Voidbound::start_run() {
 }
 
 void Voidbound::prepare_wave() {
-    spawn_remaining_ = std::min(4 + wave_ * 2, 28);
+    spawn_remaining_ = std::min(settings_.enemy_spawn_base + wave_ * settings_.enemy_spawn_per_wave,
+                                settings_.enemy_spawn_cap);
+    wave_spawn_total_ = spawn_remaining_;
     spawn_cooldown_ = 0.45F;
     pending_wave_advance_ = false;
 }
@@ -145,11 +170,12 @@ lic::world::Entity Voidbound::nearest_enemy(float x, float z) const {
 }
 
 void Voidbound::spawn_enemy() {
-    const int spawnIndex = 4 + wave_ * 2 - spawn_remaining_;
+    const int spawnIndex = wave_spawn_total_ - spawn_remaining_;
     const float angle = static_cast<float>(spawnIndex) * 2.39996323F +
                         static_cast<float>(wave_) * 0.41F;
     const float radius = 3.45F;
-    const bool elite = wave_ >= 3 && ((spawnIndex + wave_) % 5 == 0);
+    const bool elite = wave_ >= settings_.elite_start_wave &&
+                       ((spawnIndex + wave_) % settings_.elite_every_n == 0);
     lic::world::Transform transform;
     transform.position = {std::cos(angle) * radius, 0.06F, std::sin(angle) * radius};
     transform.scale = elite ? std::array<float, 3>{0.39F, 0.48F, 0.39F}
@@ -159,7 +185,9 @@ void Voidbound::spawn_enemy() {
     else appearance.color = {0.94F, 0.29F, 0.24F, 1.0F};
 
     GameActor stats;
-    stats.health = (elite ? 4.0F : 2.0F) + static_cast<float>(wave_) * 0.20F;
+    stats.health = static_cast<float>(settings_.enemy_health_base +
+        wave_ * settings_.enemy_health_per_wave +
+        (elite ? settings_.elite_health_bonus : 0)) / 100.0F;
     stats.max_health = stats.health;
     const float scriptedSpeed = static_cast<float>(settings_.enemy_speed) / 100.0F;
     stats.speed = (elite ? scriptedSpeed * 0.82F : scriptedSpeed) +
@@ -205,7 +233,7 @@ void Voidbound::spawn_experience(float x, float z, int amount) {
     appearance.color = {0.96F, 0.76F, 0.27F, 1.0F};
     GameActor stats;
     stats.reward = amount;
-    stats.lifetime = 18.0F;
+    stats.lifetime = static_cast<float>(settings_.experience_pickup_lifetime_seconds);
     (void)spawn_actor("Memory Shard", ActorKind::ExperienceOrb, lic::world::NodeKind::MeshInstance3D,
                       transform, appearance, stats);
 }
@@ -217,7 +245,7 @@ void Voidbound::finish_enemy(lic::world::Entity enemy) {
     const auto reward = world_.get<GameActor>(enemy).reward;
     if (world_.destroy_entity(enemy)) {
         ++kills_;
-        score_ += 100 * reward * wave_;
+        score_ += settings_.score_per_reward * reward * wave_;
         spawn_experience(position[0], position[2], reward);
     }
 }
@@ -228,7 +256,8 @@ void Voidbound::collect_experience(int amount) {
     while (experience_ >= experience_to_next_) {
         experience_ -= experience_to_next_;
         ++level_;
-        experience_to_next_ = 4 + level_ * 2;
+        experience_to_next_ = settings_.experience_threshold_base +
+                               level_ * settings_.experience_threshold_per_level;
         ++pending_upgrades_;
     }
     if (pending_upgrades_ > 0 && state_ == RunState::Playing) {
@@ -253,18 +282,20 @@ void Voidbound::build_upgrade_options() {
 void Voidbound::apply_upgrade(UpgradeKind kind) {
     switch (kind) {
     case UpgradeKind::RapidFire:
-        fire_interval_ = std::max(0.085F, fire_interval_ * 0.75F);
+        fire_interval_ = std::max(0.085F, fire_interval_ *
+            static_cast<float>(settings_.rapid_fire_interval_percent) / 100.0F);
         break;
     case UpgradeKind::HeavyRounds:
-        damage_ += 1.0F;
+        damage_ += static_cast<float>(settings_.heavy_round_damage);
         break;
     case UpgradeKind::Vitality:
-        max_health_ += 25.0F;
-        health_ = std::min(max_health_, health_ + 45.0F);
+        max_health_ += static_cast<float>(settings_.vitality_health_bonus);
+        health_ = std::min(max_health_, health_ + static_cast<float>(settings_.vitality_heal_amount));
         break;
     case UpgradeKind::Mobility:
-        move_speed_ += 0.28F;
-        dash_cooldown_ = std::min(dash_cooldown_, 0.35F);
+        move_speed_ += static_cast<float>(settings_.mobility_speed_bonus) / 100.0F;
+        dash_cooldown_ = std::min(dash_cooldown_,
+            static_cast<float>(settings_.mobility_dash_cooldown_ms) / 1000.0F);
         break;
     }
     if (world_.alive(player_) && world_.has<GameActor>(player_)) {
@@ -363,7 +394,9 @@ void Voidbound::update(float delta_seconds, const Input& input) {
     spawn_cooldown_ -= dt;
     if (spawn_remaining_ > 0 && spawn_cooldown_ <= 0.0F) {
         spawn_enemy();
-        spawn_cooldown_ = std::max(0.32F, 0.95F - static_cast<float>(wave_) * 0.035F);
+        const int intervalMs = std::max(settings_.spawn_interval_min_ms,
+            settings_.spawn_interval_base_ms - wave_ * settings_.spawn_interval_wave_reduction_ms);
+        spawn_cooldown_ = static_cast<float>(intervalMs) / 1000.0F;
     }
 
     std::vector<lic::world::Entity> actors;
