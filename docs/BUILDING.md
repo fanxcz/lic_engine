@@ -20,7 +20,7 @@ LIC Engine can be built in two modes:
 Open PowerShell in the repository root. The script configures a clean x64 build, compiles, runs CTest, checks the executable version, and creates a ZIP package:
 
 ```powershell
-Set-ExecutionPolicy -Scope Process Bypass
+Set-ExecutionPolicy -Scope Process Bypass -Force
 .\tools\build-windows.ps1
 ```
 
@@ -34,22 +34,22 @@ Output: `dist\lic-engine-windows-x64.zip` and `dist\lic-engine-windows-x64\lic_e
 
 ## Windows 11: build and download all platform packages
 
-Push the repository changes to GitHub first. Then, from the repository root, run:
+From the source directory, run this to build Windows/Linux/macOS on GitHub's native runners and download the generated archives:
 
 ```powershell
-gh auth login
+gh auth status
+Set-ExecutionPolicy -Scope Process Bypass -Force
 .\tools\build-all-platforms.ps1
 ```
 
-The script dispatches the **Build platform binaries** workflow, waits for it to finish, and downloads its packages into `dist\platform-builds\`. Packages are also available on the repository's **Actions** page for 30 days after each run. Pushing a version tag such as `v0.1.0` creates a GitHub Release with the generated archives attached.
-
+Authenticate only if needed with gh auth login. The execution-policy change is restricted to the current PowerShell process; it does not weaken the machine-wide policy. The script starts **Build platform binaries**, waits for the platform jobs, and downloads archives into dist\platform-builds\. Successful builds from main also refresh the rolling download links near the top of the README. Version tags such as v0.1.0 publish versioned releases.
 
 ### Important: source ZIP vs Git clone
 
 If you got the source using GitHub's **Download ZIP**, that folder is not a Git clone, so `git pull` will not update it. Do not mark the whole drive `D:/` as a safe Git directory just to bypass an ownership warning. Either download the ZIP again from the repository, or create a proper clone in a new folder:
 
 ```powershell
-git clone https://github.com/fanxcz/lic_engine.git D:\\lic_engine
+git clone https://github.com/fanxcz/lic_engine.git D:\lic_engine
 Set-Location D:\\lic_engine
 ```
 
