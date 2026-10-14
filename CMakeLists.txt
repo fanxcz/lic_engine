@@ -35,6 +35,12 @@ add_library(LIC::Core ALIAS lic_core)
 target_include_directories(lic_core PUBLIC engine/core/include)
 target_link_libraries(lic_core PUBLIC lic_build_options)
 
+# The world module is header-only and remains independent of graphics APIs.
+add_library(lic_world INTERFACE)
+add_library(LIC::World ALIAS lic_world)
+target_include_directories(lic_world INTERFACE engine/world/include)
+target_link_libraries(lic_world INTERFACE lic_build_options)
+
 add_executable(lic_editor editor/src/main.cpp)
 target_link_libraries(lic_editor PRIVATE LIC::Core lic_build_options)
 
@@ -116,7 +122,7 @@ endif()
 
 if(BUILD_TESTING AND LIC_ENGINE_BUILD_TESTS)
     add_executable(lic_core_tests tests/core_tests.cpp)
-    target_link_libraries(lic_core_tests PRIVATE LIC::Core lic_build_options)
+    target_link_libraries(lic_core_tests PRIVATE LIC::Core LIC::World lic_build_options)
     add_test(NAME lic_core_tests COMMAND lic_core_tests)
     add_test(NAME lic_editor_help COMMAND lic_editor --help)
     add_test(NAME lic_editor_version COMMAND lic_editor --version)
