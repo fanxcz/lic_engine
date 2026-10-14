@@ -43,6 +43,18 @@ gh auth login
 
 The script dispatches the **Build platform binaries** workflow, waits for it to finish, and downloads its packages into `dist\platform-builds\`. Packages are also available on the repository's **Actions** page for 30 days after each run. Pushing a version tag such as `v0.1.0` creates a GitHub Release with the generated archives attached.
 
+
+### Important: source ZIP vs Git clone
+
+If you got the source using GitHub's **Download ZIP**, that folder is not a Git clone, so `git pull` will not update it. Do not mark the whole drive `D:/` as a safe Git directory just to bypass an ownership warning. Either download the ZIP again from the repository, or create a proper clone in a new folder:
+
+```powershell
+git clone https://github.com/fanxcz/lic_engine.git D:\\lic_engine
+Set-Location D:\\lic_engine
+```
+
+The all-platform build script can still be run from an extracted source ZIP as long as the script is present and `gh auth status` succeeds; it dispatches the workflow in the GitHub repository.
+
 Current package scope:
 - `lic-engine-windows-x64.zip`: Windows x64 executable; the workflow builds the Vulkan viewport and includes its SPIR-V shaders.
 - `lic-engine-linux-x64.tar.gz`: Linux x64 executable with the Vulkan viewport and shaders.
