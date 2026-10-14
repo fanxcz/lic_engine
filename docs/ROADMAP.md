@@ -50,14 +50,14 @@ A milestone is not complete because directories or placeholder classes exist. Ea
 
 ## M4 — Gameplay loop
 
-- [ ] Action-based input mappings.
-- [ ] Fixed-step update and frame-rate-independent timing.
-- [ ] Jolt adapter for rigid bodies, collision shapes, and ray queries.
-- [ ] miniaudio adapter for playback and spatial attenuation.
-- [ ] Prefabs and reusable scene objects.
-- [ ] Documented C++ game-module example.
+- [x] First playable native C++ game, VOIDBOUND, built on the LIC world model and Vulkan renderer.
+- [x] Keyboard movement, dash, pulse projectiles, enemy pursuit, contact damage, score, endless waves and experience shards.
+- [x] Level-ups with four upgrade types, health HUD, main menu, pause/restart/game-over overlays.
+- [x] Standalone `voidbound.exe` / Linux `voidbound` target and automated headless gameplay tests.
+- [ ] General input mapping layer, physics adapter, audio, prefabs and reusable scene assets.
+- [ ] Replace primitive cubes with imported meshes and add a standalone scene/runtime format.
 
-**Exit criteria:** an interactive sample uses input, physics, and audio through engine APIs.
+**Exit criteria:** evolve VOIDBOUND from a playable primitive prototype into a content-driven game using reusable engine systems.
 
 ## M5 — Asset workflow and standalone games
 

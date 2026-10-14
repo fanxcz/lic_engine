@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added VOIDBOUND, a playable arena-survival action game using the LIC Engine world and Vulkan renderer.
+- Added player movement, dash, pulse projectiles, enemy AI, scaling waves, score, health, experience pickups, level-ups and four upgrades.
+- Added game HUD, main menu, pause/restart/game-over overlays and standalone `voidbound` launch targets for Vulkan builds.
+- Added headless tests for movement, pause/resume, run startup and menu cleanup.
+
 - Added a Dear ImGui editor shell with scene tree, transform/material inspector, FileSystem, Output and Console panels.
 - Added editable mesh-node transforms/material colors, node create/duplicate/delete, viewport orbit/zoom and a temporary Play/Stop preview.
 - Added versioned scene save/load and malformed-file validation tests.
