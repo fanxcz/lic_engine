@@ -63,6 +63,11 @@ if ($LASTEXITCODE -ne 0) { throw "Tests failed with exit code $LASTEXITCODE." }
 $executable = Join-Path $buildDir "$Configuration/lic_editor.exe"
 if (-not (Test-Path $executable)) { throw "Expected executable was not produced: $executable" }
 Copy-Item $executable (Join-Path $packageDir "lic_editor.exe") -Force
+if ($enableVulkan) {
+    $gameExecutable = Join-Path $buildDir "$Configuration/voidbound.exe"
+    if (-not (Test-Path $gameExecutable)) { throw "Expected Voidbound executable was not produced: $gameExecutable" }
+    Copy-Item $gameExecutable (Join-Path $packageDir "voidbound.exe") -Force
+}
 $shaderDir = Join-Path (Split-Path $executable -Parent) "shaders"
 if ($enableVulkan) {
     foreach ($shader in @("viewport.vert.spv", "viewport.frag.spv")) {
@@ -94,6 +99,17 @@ if ($enableVulkan) {
         throw "The Vulkan viewport was built, but vulkan-1.dll could not be packaged. Check the Vulkan SDK installation."
     }
     Copy-Item $vulkanLoader (Join-Path $packageDir "vulkan-1.dll") -Force
+}
+if ($enableVulkan) {
+    Set-Content -Encoding ascii (Join-Path $packageDir "run-voidbound.bat") -Value @(
+        "@echo off",
+        "setlocal",
+        'cd /d "%~dp0"',
+        '"voidbound.exe" %*',
+        'set "exitCode=%ERRORLEVEL%"',
+        'if not "%exitCode%"=="0" pause',
+        "exit /b %exitCode%"
+    )
 }
 Set-Content -Encoding ascii (Join-Path $packageDir "run-lic-engine.bat") -Value @(
     "@echo off",
@@ -129,7 +145,7 @@ Write-Host ([Environment]::NewLine + "Build complete.") -ForegroundColor Green
 Write-Host "Executable: $executable"
 Write-Host "Package:    $archive"
 if ($enableVulkan) {
-    Write-Host "Mode:       Vulkan viewport enabled (launch the EXE to open the cube scene)."
+    Write-Host "Mode:       Vulkan editor + VOIDBOUND game (launch voidbound.exe)."
 } else {
     Write-Host "Mode:       Core-only CLI. Use the GitHub platform workflow or install the Vulkan SDK for the 3D viewport."
 }

@@ -110,7 +110,7 @@ if(LIC_ENGINE_ENABLE_VULKAN)
         add_library(lic_editor_ui engine/editor/src/editor_ui.cpp)
         add_library(LIC::EditorUI ALIAS lic_editor_ui)
         target_include_directories(lic_editor_ui PUBLIC engine/editor/include)
-        target_link_libraries(lic_editor_ui PUBLIC LIC::World LIC::ImGui lic_build_options)
+        target_link_libraries(lic_editor_ui PUBLIC LIC::World LIC::Game LIC::ImGui lic_build_options)
 
         set(LIC_SHADER_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/renderer_shaders")
         set(LIC_VERTEX_SPIRV "${LIC_SHADER_OUTPUT_DIR}/viewport.vert.spv")

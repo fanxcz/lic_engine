@@ -1,4 +1,5 @@
 #include <lic/core/version.hpp>
+#include <lic/game/voidbound.hpp>
 #include <lic/world/scene.hpp>
 
 #include <cstdlib>
@@ -168,10 +169,40 @@ void test_scene_serialization() {
     std::filesystem::remove_all(folder, ignored);
 }
 
+void test_voidbound_gameplay() {
+    lic::game::Voidbound game;
+    expect(game.state() == lic::game::RunState::Menu, "Voidbound should open to a main menu");
+    game.start_run();
+    expect(game.state() == lic::game::RunState::Playing, "starting a run should enter gameplay");
+    expect(game.world().alive(game.player()), "gameplay should create a player entity");
+    expect(game.world().entity_count() >= 24, "gameplay should create an arena with markers and pillars");
+
+    const auto start = game.world().get<lic::world::Transform>(game.player()).position;
+    for (int i = 0; i < 30; ++i) {
+        game.update(0.01F, lic::game::Input{1.0F, 0.0F, false, false});
+    }
+    const auto moved = game.world().get<lic::world::Transform>(game.player()).position;
+    expect(moved[0] > start[0] + 0.5F, "WASD-style input should move the player");
+    expect(game.wave() == 1, "the first run should start at wave one");
+
+    game.pause();
+    expect(game.state() == lic::game::RunState::Paused, "pause should suspend active gameplay");
+    const auto pausedPosition = game.world().get<lic::world::Transform>(game.player()).position;
+    game.update(0.05F, lic::game::Input{0.0F, 1.0F, true, true});
+    const auto stillPaused = game.world().get<lic::world::Transform>(game.player()).position;
+    expect(pausedPosition == stillPaused, "paused gameplay should not advance entities");
+    game.resume();
+    expect(game.state() == lic::game::RunState::Playing, "resume should return to gameplay");
+    game.show_menu();
+    expect(game.state() == lic::game::RunState::Menu, "main menu should be reachable after a run");
+    expect(game.world().entity_count() == 0, "returning to the menu should release gameplay entities");
+}
+
 int main() {
     test_version();
     test_world_entity_lifecycle();
     test_scene_serialization();
-    std::cout << "LIC Engine core, world and scene tests passed.\n";
+    test_voidbound_gameplay();
+    std::cout << "LIC Engine core, world, scene and gameplay tests passed.\n";
     return EXIT_SUCCESS;
 }

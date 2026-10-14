@@ -44,6 +44,8 @@ jobs:
           $package = "dist/lic-engine-windows-x64"
           New-Item -ItemType Directory -Force -Path $package | Out-Null
           Copy-Item "build/Release/lic_editor.exe" "$package/lic_editor.exe"
+          if (-not (Test-Path "build/Release/voidbound.exe")) { throw "Missing standalone Voidbound game executable." }
+          Copy-Item "build/Release/voidbound.exe" "$package/voidbound.exe"
           foreach ($shader in @("viewport.vert.spv", "viewport.frag.spv")) {
             if (-not (Test-Path "build/Release/shaders/$shader")) { throw "Missing compiled Vulkan shader: $shader" }
           }
@@ -67,6 +69,20 @@ jobs:
           if (-not (Test-Path "$package/vulkan-1.dll")) { throw "Missing packaged Vulkan loader." }
           Copy-Item "README.md" "$package/README.md"
           Copy-Item "docs/BUILDING.md" "$package/BUILDING.md"
+          Set-Content -Encoding ascii "$package/run-voidbound.bat" -Value @(
+            "@echo off",
+            "setlocal",
+            'cd /d "%~dp0"',
+            'if not exist "voidbound.exe" (',
+            "  echo Voidbound game executable is missing from this package.",
+            "  pause",
+            "  exit /b 2",
+            ")",
+            '"voidbound.exe" %*',
+            'set "exitCode=%ERRORLEVEL%"',
+            'if not "%exitCode%"=="0" pause',
+            "exit /b %exitCode%"
+          )
           Set-Content -Encoding ascii "$package/run-lic-engine.bat" -Value @(
             "@echo off",
             "setlocal",
@@ -90,7 +106,9 @@ jobs:
             "exit /b %exitCode%"
           )
           & "$package/lic_editor.exe" --version
-          if ($LASTEXITCODE -ne 0) { throw "The packaged executable failed its version smoke test." }
+          if ($LASTEXITCODE -ne 0) { throw "The packaged editor failed its version smoke test." }
+          & "$package/voidbound.exe" --version
+          if ($LASTEXITCODE -ne 0) { throw "The packaged game failed its version smoke test." }
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Compress-Archive -Path "$package/*" -DestinationPath "dist/lic-engine-windows-x64.zip" -Force
 
@@ -130,6 +148,7 @@ jobs:
           package="dist/lic-engine-linux-x64"
           mkdir -p "$package"
           install -m 0755 build/lic_editor "$package/lic_editor"
+          install -m 0755 build/voidbound "$package/voidbound"
           test -f build/shaders/viewport.vert.spv
           test -f build/shaders/viewport.frag.spv
           cp -R build/shaders "$package/shaders"
@@ -142,7 +161,15 @@ jobs:
           exec ./lic_editor "$@"
           EOF
           chmod +x "$package/run-lic-engine.sh"
+          cat > "$package/run-voidbound.sh" <<'EOF'
+          #!/usr/bin/env sh
+          set -eu
+          cd "$(dirname "$0")"
+          exec ./voidbound "$@"
+          EOF
+          chmod +x "$package/run-voidbound.sh"
           "$package/lic_editor" --version
+          "$package/voidbound" --version
           tar -C dist -czf dist/lic-engine-linux-x64.tar.gz lic-engine-linux-x64
 
       - uses: actions/upload-artifact@v4
