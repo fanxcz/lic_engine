@@ -20,7 +20,6 @@ jobs:
         with:
           vulkan_version: 1.4.304.1
           cache: true
-          stripdown: true
           install_runtime: true
 
       - name: Configure
@@ -39,8 +38,13 @@ jobs:
           $package = "dist/lic-engine-windows-x64"
           New-Item -ItemType Directory -Force -Path $package | Out-Null
           Copy-Item "build/Release/lic_editor.exe" "$package/lic_editor.exe"
-          if (Test-Path "build/Release/shaders") {
-            Copy-Item "build/Release/shaders" "$package/shaders" -Recurse -Force
+          foreach ($shader in @("viewport.vert.spv", "viewport.frag.spv")) {
+            if (-not (Test-Path "build/Release/shaders/$shader")) { throw "Missing compiled Vulkan shader: $shader" }
+          }
+          Copy-Item "build/Release/shaders" "$package/shaders" -Recurse -Force
+          if ($env:VULKAN_SDK) {
+            $loader = Join-Path $env:VULKAN_SDK "Runtime/x64/vulkan-1.dll"
+            if (Test-Path $loader) { Copy-Item $loader "$package/vulkan-1.dll" -Force }
           }
           Copy-Item "README.md" "$package/README.md"
           Copy-Item "docs/BUILDING.md" "$package/BUILDING.md"
@@ -82,7 +86,9 @@ jobs:
           package="dist/lic-engine-linux-x64"
           mkdir -p "$package"
           install -m 0755 build/lic_editor "$package/lic_editor"
-          if [ -d build/shaders ]; then cp -R build/shaders "$package/shaders"; fi
+          test -f build/shaders/viewport.vert.spv
+          test -f build/shaders/viewport.frag.spv
+          cp -R build/shaders "$package/shaders"
           cp README.md "$package/README.md"
           cp docs/BUILDING.md "$package/BUILDING.md"
           tar -C dist -czf dist/lic-engine-linux-x64.tar.gz lic-engine-linux-x64
