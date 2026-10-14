@@ -48,6 +48,25 @@ void test_world_entity_lifecycle() {
     expect(world.get<Position>(first).x == 1.0F, "component lookup should return the right entity");
     expect(world.get<Position>(second).y == 5.0F, "sparse-set swap should preserve other components");
     expect(world.get<Name>(first).value == "player", "non-trivial movable component should be supported");
+
+    float position_x_sum = 0.0F;
+    std::size_t visited_positions = 0;
+    world.each<Position>([&](lic::world::Entity entity, Position& position) {
+        expect(world.alive(entity), "iteration should expose live entity handles");
+        position_x_sum += position.x;
+        ++visited_positions;
+    });
+    expect(visited_positions == 2, "each should visit every component exactly once");
+    expect(position_x_sum == 5.0F, "each should expose mutable component references");
+
+    const auto& const_world = world;
+    std::size_t const_visited_positions = 0;
+    const_world.each<Position>([&](lic::world::Entity, const Position& position) {
+        expect(position.x > 0.0F, "const iteration should expose a read-only component");
+        ++const_visited_positions;
+    });
+    expect(const_visited_positions == 2, "const each should visit every component");
+
     expect(world.has<Position>(first), "has should detect a component");
     expect(!world.has<Name>(second), "has should reject a missing component");
 
