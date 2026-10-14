@@ -87,6 +87,94 @@ fn mobility_dash_cooldown_ms() -> i64 {
     return 350
 }
 
+fn arena_limit_centi() -> i64 {
+    return 335
+}
+
+fn enemy_spawn_radius_centi() -> i64 {
+    return 345
+}
+
+fn enemy_speed_wave_bonus_centi() -> i64 {
+    return 25
+}
+
+fn enemy_speed_wave_bonus_cap_centi() -> i64 {
+    return 42
+}
+
+fn elite_speed_percent() -> i64 {
+    return 82
+}
+
+fn initial_spawn_delay_ms() -> i64 {
+    return 450
+}
+
+fn enemy_initial_contact_cooldown_ms() -> i64 {
+    return 200
+}
+
+fn player_dash_distance_centi() -> i64 {
+    return 100
+}
+
+fn player_dash_duration_ms() -> i64 {
+    return 180
+}
+
+fn dash_invulnerability_ms() -> i64 {
+    return 340
+}
+
+fn enemy_contact_damage() -> i64 {
+    return 8
+}
+
+fn elite_contact_damage() -> i64 {
+    return 13
+}
+
+fn enemy_contact_range_centi() -> i64 {
+    return 52
+}
+
+fn enemy_contact_cooldown_ms() -> i64 {
+    return 720
+}
+
+fn player_hit_invulnerability_ms() -> i64 {
+    return 350
+}
+
+fn projectile_speed_centi() -> i64 {
+    return 680
+}
+
+fn projectile_lifetime_ms() -> i64 {
+    return 1100
+}
+
+fn projectile_hit_radius_centi() -> i64 {
+    return 40
+}
+
+fn no_target_fire_delay_ms() -> i64 {
+    return 50
+}
+
+fn experience_attraction_range_centi() -> i64 {
+    return 110
+}
+
+fn experience_attraction_speed_centi() -> i64 {
+    return 125
+}
+
+fn experience_collect_range_centi() -> i64 {
+    return 35
+}
+
 fn main() {
     print("LICCFG_PLAYER_HEALTH=" + str_i64(player_health()))
     print("LICCFG_PLAYER_SPEED=" + str_i64(player_speed()))
@@ -115,4 +203,26 @@ fn main() {
     print("LICCFG_VITALITY_HEAL_AMOUNT=" + str_i64(vitality_heal_amount()))
     print("LICCFG_MOBILITY_SPEED_BONUS=" + str_i64(mobility_speed_bonus()))
     print("LICCFG_MOBILITY_DASH_COOLDOWN_MS=" + str_i64(mobility_dash_cooldown_ms()))
+    print("LICCFG_ARENA_LIMIT_CENTI=" + str_i64(arena_limit_centi()))
+    print("LICCFG_ENEMY_SPAWN_RADIUS_CENTI=" + str_i64(enemy_spawn_radius_centi()))
+    print("LICCFG_ENEMY_SPEED_WAVE_BONUS_CENTI=" + str_i64(enemy_speed_wave_bonus_centi()))
+    print("LICCFG_ENEMY_SPEED_WAVE_BONUS_CAP_CENTI=" + str_i64(enemy_speed_wave_bonus_cap_centi()))
+    print("LICCFG_ELITE_SPEED_PERCENT=" + str_i64(elite_speed_percent()))
+    print("LICCFG_INITIAL_SPAWN_DELAY_MS=" + str_i64(initial_spawn_delay_ms()))
+    print("LICCFG_ENEMY_INITIAL_CONTACT_COOLDOWN_MS=" + str_i64(enemy_initial_contact_cooldown_ms()))
+    print("LICCFG_PLAYER_DASH_DISTANCE_CENTI=" + str_i64(player_dash_distance_centi()))
+    print("LICCFG_PLAYER_DASH_DURATION_MS=" + str_i64(player_dash_duration_ms()))
+    print("LICCFG_DASH_INVULNERABILITY_MS=" + str_i64(dash_invulnerability_ms()))
+    print("LICCFG_ENEMY_CONTACT_DAMAGE=" + str_i64(enemy_contact_damage()))
+    print("LICCFG_ELITE_CONTACT_DAMAGE=" + str_i64(elite_contact_damage()))
+    print("LICCFG_ENEMY_CONTACT_RANGE_CENTI=" + str_i64(enemy_contact_range_centi()))
+    print("LICCFG_ENEMY_CONTACT_COOLDOWN_MS=" + str_i64(enemy_contact_cooldown_ms()))
+    print("LICCFG_PLAYER_HIT_INVULNERABILITY_MS=" + str_i64(player_hit_invulnerability_ms()))
+    print("LICCFG_PROJECTILE_SPEED_CENTI=" + str_i64(projectile_speed_centi()))
+    print("LICCFG_PROJECTILE_LIFETIME_MS=" + str_i64(projectile_lifetime_ms()))
+    print("LICCFG_PROJECTILE_HIT_RADIUS_CENTI=" + str_i64(projectile_hit_radius_centi()))
+    print("LICCFG_NO_TARGET_FIRE_DELAY_MS=" + str_i64(no_target_fire_delay_ms()))
+    print("LICCFG_EXPERIENCE_ATTRACTION_RANGE_CENTI=" + str_i64(experience_attraction_range_centi()))
+    print("LICCFG_EXPERIENCE_ATTRACTION_SPEED_CENTI=" + str_i64(experience_attraction_speed_centi()))
+    print("LICCFG_EXPERIENCE_COLLECT_RANGE_CENTI=" + str_i64(experience_collect_range_centi()))
 }

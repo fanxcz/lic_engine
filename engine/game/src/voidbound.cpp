@@ -12,7 +12,6 @@
 namespace lic::game {
 namespace {
 
-constexpr float kArenaLimit = 3.35F;
 constexpr float kPi = 3.14159265358979323846F;
 
 [[nodiscard]] float squared_distance(float ax, float az, float bx, float bz) noexcept {
@@ -78,6 +77,28 @@ void Voidbound::apply_script_settings(const ScriptSettings& settings) noexcept {
     settings_.mobility_dash_cooldown_ms = std::clamp(settings.mobility_dash_cooldown_ms, 100, 2000);
     settings_.experience_pickup_lifetime_seconds =
         std::clamp(settings.experience_pickup_lifetime_seconds, 3, 120);
+    settings_.arena_limit_centi = std::clamp(settings.arena_limit_centi, 150, 1000);
+    settings_.enemy_spawn_radius_centi = std::clamp(settings.enemy_spawn_radius_centi, 160, 1200);
+    settings_.enemy_speed_wave_bonus_centi = std::clamp(settings.enemy_speed_wave_bonus_centi, 0, 50);
+    settings_.enemy_speed_wave_bonus_cap_centi = std::clamp(settings.enemy_speed_wave_bonus_cap_centi, 0, 150);
+    settings_.elite_speed_percent = std::clamp(settings.elite_speed_percent, 40, 100);
+    settings_.initial_spawn_delay_ms = std::clamp(settings.initial_spawn_delay_ms, 100, 2500);
+    settings_.enemy_initial_contact_cooldown_ms = std::clamp(settings.enemy_initial_contact_cooldown_ms, 0, 2000);
+    settings_.player_dash_distance_centi = std::clamp(settings.player_dash_distance_centi, 20, 300);
+    settings_.player_dash_duration_ms = std::clamp(settings.player_dash_duration_ms, 50, 1000);
+    settings_.dash_invulnerability_ms = std::clamp(settings.dash_invulnerability_ms, 50, 1500);
+    settings_.enemy_contact_damage = std::clamp(settings.enemy_contact_damage, 1, 100);
+    settings_.elite_contact_damage = std::clamp(settings.elite_contact_damage, 1, 200);
+    settings_.enemy_contact_range_centi = std::clamp(settings.enemy_contact_range_centi, 20, 150);
+    settings_.enemy_contact_cooldown_ms = std::clamp(settings.enemy_contact_cooldown_ms, 100, 5000);
+    settings_.player_hit_invulnerability_ms = std::clamp(settings.player_hit_invulnerability_ms, 50, 2000);
+    settings_.projectile_speed_centi = std::clamp(settings.projectile_speed_centi, 100, 2000);
+    settings_.projectile_lifetime_ms = std::clamp(settings.projectile_lifetime_ms, 100, 10000);
+    settings_.projectile_hit_radius_centi = std::clamp(settings.projectile_hit_radius_centi, 10, 100);
+    settings_.no_target_fire_delay_ms = std::clamp(settings.no_target_fire_delay_ms, 0, 1000);
+    settings_.experience_attraction_range_centi = std::clamp(settings.experience_attraction_range_centi, 20, 500);
+    settings_.experience_attraction_speed_centi = std::clamp(settings.experience_attraction_speed_centi, 0, 1000);
+    settings_.experience_collect_range_centi = std::clamp(settings.experience_collect_range_centi, 10, 100);
 }
 
 void Voidbound::start_run() {
@@ -148,7 +169,7 @@ void Voidbound::prepare_wave() {
     spawn_remaining_ = std::min(settings_.enemy_spawn_base + wave_ * settings_.enemy_spawn_per_wave,
                                 settings_.enemy_spawn_cap);
     wave_spawn_total_ = spawn_remaining_;
-    spawn_cooldown_ = 0.45F;
+    spawn_cooldown_ = static_cast<float>(settings_.initial_spawn_delay_ms) / 1000.0F;
     pending_wave_advance_ = false;
 }
 
@@ -173,7 +194,7 @@ void Voidbound::spawn_enemy() {
     const int spawnIndex = wave_spawn_total_ - spawn_remaining_;
     const float angle = static_cast<float>(spawnIndex) * 2.39996323F +
                         static_cast<float>(wave_) * 0.41F;
-    const float radius = 3.45F;
+    const float radius = static_cast<float>(settings_.enemy_spawn_radius_centi) / 100.0F;
     const bool elite = wave_ >= settings_.elite_start_wave &&
                        ((spawnIndex + wave_) % settings_.elite_every_n == 0);
     lic::world::Transform transform;
@@ -190,9 +211,11 @@ void Voidbound::spawn_enemy() {
         (elite ? settings_.elite_health_bonus : 0)) / 100.0F;
     stats.max_health = stats.health;
     const float scriptedSpeed = static_cast<float>(settings_.enemy_speed) / 100.0F;
-    stats.speed = (elite ? scriptedSpeed * 0.82F : scriptedSpeed) +
-                  std::min(static_cast<float>(wave_) * 0.025F, 0.42F);
-    stats.cooldown = 0.2F;
+    stats.speed = (elite ? scriptedSpeed *
+        static_cast<float>(settings_.elite_speed_percent) / 100.0F : scriptedSpeed) +
+        std::min(static_cast<float>(wave_ * settings_.enemy_speed_wave_bonus_centi) / 100.0F,
+                 static_cast<float>(settings_.enemy_speed_wave_bonus_cap_centi) / 100.0F);
+    stats.cooldown = static_cast<float>(settings_.enemy_initial_contact_cooldown_ms) / 1000.0F;
     stats.reward = elite ? 3 : 1;
     (void)spawn_actor((elite ? "Rift Brute " : "Rift Stalker ") + std::to_string(kills_ + spawnIndex + 1),
                       ActorKind::Enemy, lic::world::NodeKind::MeshInstance3D,
@@ -217,9 +240,10 @@ void Voidbound::spawn_projectile(float targetX, float targetZ) {
     lic::world::Appearance appearance;
     appearance.color = {0.43F, 1.0F, 0.68F, 1.0F};
     GameActor stats;
-    stats.velocity_x = dx * 6.8F;
-    stats.velocity_z = dz * 6.8F;
-    stats.lifetime = 1.1F;
+    const float projectileSpeed = static_cast<float>(settings_.projectile_speed_centi) / 100.0F;
+    stats.velocity_x = dx * projectileSpeed;
+    stats.velocity_z = dz * projectileSpeed;
+    stats.lifetime = static_cast<float>(settings_.projectile_lifetime_ms) / 1000.0F;
     stats.health = damage_;
     (void)spawn_actor("Pulse", ActorKind::Projectile, lic::world::NodeKind::MeshInstance3D,
                       transform, appearance, stats);
@@ -354,9 +378,10 @@ void Voidbound::update(float delta_seconds, const Input& input) {
     playerTransform.position[0] += moveX * move_speed_ * dt;
     playerTransform.position[2] += moveZ * move_speed_ * dt;
     if (input.dash_pressed && dash_cooldown_ <= 0.0F) {
+        const float dashDistance = static_cast<float>(settings_.player_dash_distance_centi) / 100.0F;
         if (moveLength > 0.05F) {
-            playerTransform.position[0] += moveX * 1.0F;
-            playerTransform.position[2] += moveZ * 1.0F;
+            playerTransform.position[0] += moveX * dashDistance;
+            playerTransform.position[2] += moveZ * dashDistance;
         } else {
             const auto target = nearest_enemy(playerTransform.position[0], playerTransform.position[2]);
             if (target.valid()) {
@@ -364,16 +389,17 @@ void Voidbound::update(float delta_seconds, const Input& input) {
                 float dx = playerTransform.position[0] - targetPos[0];
                 float dz = playerTransform.position[2] - targetPos[2];
                 const float length = std::max(0.001F, std::sqrt(dx * dx + dz * dz));
-                playerTransform.position[0] += (dx / length) * 1.0F;
-                playerTransform.position[2] += (dz / length) * 1.0F;
+                playerTransform.position[0] += (dx / length) * dashDistance;
+                playerTransform.position[2] += (dz / length) * dashDistance;
             }
         }
         dash_cooldown_ = dash_cooldown_duration_;
-        dash_time_ = 0.18F;
-        invulnerability_time_ = 0.34F;
+        dash_time_ = static_cast<float>(settings_.player_dash_duration_ms) / 1000.0F;
+        invulnerability_time_ = static_cast<float>(settings_.dash_invulnerability_ms) / 1000.0F;
     }
-    playerTransform.position[0] = std::clamp(playerTransform.position[0], -kArenaLimit, kArenaLimit);
-    playerTransform.position[2] = std::clamp(playerTransform.position[2], -kArenaLimit, kArenaLimit);
+    const float arenaLimit = static_cast<float>(settings_.arena_limit_centi) / 100.0F;
+    playerTransform.position[0] = std::clamp(playerTransform.position[0], -arenaLimit, arenaLimit);
+    playerTransform.position[2] = std::clamp(playerTransform.position[2], -arenaLimit, arenaLimit);
     playerTransform.rotation_degrees[1] = std::atan2(moveX, moveZ) * 57.29578F;
 
     auto& playerStats = world_.get<GameActor>(player_);
@@ -387,7 +413,7 @@ void Voidbound::update(float delta_seconds, const Input& input) {
             spawn_projectile(targetPosition[0], targetPosition[2]);
             fire_cooldown_ = fire_interval_;
         } else {
-            fire_cooldown_ = 0.05F;
+            fire_cooldown_ = static_cast<float>(settings_.no_target_fire_delay_ms) / 1000.0F;
         }
     }
 
@@ -418,13 +444,17 @@ void Voidbound::update(float delta_seconds, const Input& input) {
             transform.position[2] += (dz / distance) * speed * dt;
             transform.rotation_degrees[1] = std::atan2(dx, dz) * 57.29578F;
         }
-        if (distance < 0.52F && enemy.cooldown <= 0.0F) {
+        if (distance < static_cast<float>(settings_.enemy_contact_range_centi) / 100.0F &&
+            enemy.cooldown <= 0.0F) {
             if (invulnerability_time_ <= 0.0F) {
-                health_ = std::max(0.0F, health_ - (enemy.reward > 1 ? 13.0F : 8.0F));
+                const int contactDamage = enemy.reward > 1
+                    ? settings_.elite_contact_damage : settings_.enemy_contact_damage;
+                health_ = std::max(0.0F, health_ - static_cast<float>(contactDamage));
                 playerStats.health = health_;
-                invulnerability_time_ = 0.35F;
+                invulnerability_time_ =
+                    static_cast<float>(settings_.player_hit_invulnerability_ms) / 1000.0F;
             }
-            enemy.cooldown = 0.72F;
+            enemy.cooldown = static_cast<float>(settings_.enemy_contact_cooldown_ms) / 1000.0F;
         }
     }
 
@@ -451,7 +481,9 @@ void Voidbound::update(float delta_seconds, const Input& input) {
             if (candidate == projectile || !world_.alive(candidate) || !world_.has<GameActor>(candidate) ||
                 world_.get<GameActor>(candidate).kind != ActorKind::Enemy) continue;
             const auto& enemyPos = world_.get<lic::world::Transform>(candidate).position;
-            if (squared_distance(transform.position[0], transform.position[2], enemyPos[0], enemyPos[2]) < 0.16F) {
+            const float hitRadius = static_cast<float>(settings_.projectile_hit_radius_centi) / 100.0F;
+            if (squared_distance(transform.position[0], transform.position[2], enemyPos[0], enemyPos[2]) <
+                hitRadius * hitRadius) {
                 hit = candidate;
                 break;
             }
@@ -478,11 +510,14 @@ void Voidbound::update(float delta_seconds, const Input& input) {
         const float dx = playerTransform.position[0] - transform.position[0];
         const float dz = playerTransform.position[2] - transform.position[2];
         const float distance = std::sqrt(dx * dx + dz * dz);
-        if (distance < 1.1F && distance > 0.001F) {
-            transform.position[0] += (dx / distance) * dt * 1.25F;
-            transform.position[2] += (dz / distance) * dt * 1.25F;
+        const float attractionRange = static_cast<float>(settings_.experience_attraction_range_centi) / 100.0F;
+        const float attractionSpeed = static_cast<float>(settings_.experience_attraction_speed_centi) / 100.0F;
+        const float collectRange = static_cast<float>(settings_.experience_collect_range_centi) / 100.0F;
+        if (distance < attractionRange && distance > 0.001F) {
+            transform.position[0] += (dx / distance) * dt * attractionSpeed;
+            transform.position[2] += (dz / distance) * dt * attractionSpeed;
         }
-        if (distance < 0.35F) {
+        if (distance < collectRange) {
             const int reward = stats.reward;
             (void)world_.destroy_entity(pickup);
             collect_experience(reward);

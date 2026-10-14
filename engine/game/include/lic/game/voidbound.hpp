@@ -66,6 +66,28 @@ struct ScriptSettings final {
     int mobility_speed_bonus{28};            // hundredths of game units per second
     int mobility_dash_cooldown_ms{350};
     int experience_pickup_lifetime_seconds{18};
+    int arena_limit_centi{335};
+    int enemy_spawn_radius_centi{345};
+    int enemy_speed_wave_bonus_centi{25};
+    int enemy_speed_wave_bonus_cap_centi{42};
+    int elite_speed_percent{82};
+    int initial_spawn_delay_ms{450};
+    int enemy_initial_contact_cooldown_ms{200};
+    int player_dash_distance_centi{100};
+    int player_dash_duration_ms{180};
+    int dash_invulnerability_ms{340};
+    int enemy_contact_damage{8};
+    int elite_contact_damage{13};
+    int enemy_contact_range_centi{52};
+    int enemy_contact_cooldown_ms{720};
+    int player_hit_invulnerability_ms{350};
+    int projectile_speed_centi{680};
+    int projectile_lifetime_ms{1100};
+    int projectile_hit_radius_centi{40};
+    int no_target_fire_delay_ms{50};
+    int experience_attraction_range_centi{110};
+    int experience_attraction_speed_centi{125};
+    int experience_collect_range_centi{35};
 };
 
 class Voidbound final {

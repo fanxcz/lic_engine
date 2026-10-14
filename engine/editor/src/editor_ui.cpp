@@ -1025,7 +1025,29 @@ void parse_nexus_settings(const std::string& output, lic::game::ScriptSettings& 
                parse_setting_value(line, "LICCFG_VITALITY_HEALTH_BONUS", settings.vitality_health_bonus) ||
                parse_setting_value(line, "LICCFG_VITALITY_HEAL_AMOUNT", settings.vitality_heal_amount) ||
                parse_setting_value(line, "LICCFG_MOBILITY_SPEED_BONUS", settings.mobility_speed_bonus) ||
-               parse_setting_value(line, "LICCFG_MOBILITY_DASH_COOLDOWN_MS", settings.mobility_dash_cooldown_ms));
+               parse_setting_value(line, "LICCFG_MOBILITY_DASH_COOLDOWN_MS", settings.mobility_dash_cooldown_ms) ||
+               parse_setting_value(line, "LICCFG_ARENA_LIMIT_CENTI", settings.arena_limit_centi) ||
+               parse_setting_value(line, "LICCFG_ENEMY_SPAWN_RADIUS_CENTI", settings.enemy_spawn_radius_centi) ||
+               parse_setting_value(line, "LICCFG_ENEMY_SPEED_WAVE_BONUS_CENTI", settings.enemy_speed_wave_bonus_centi) ||
+               parse_setting_value(line, "LICCFG_ENEMY_SPEED_WAVE_BONUS_CAP_CENTI", settings.enemy_speed_wave_bonus_cap_centi) ||
+               parse_setting_value(line, "LICCFG_ELITE_SPEED_PERCENT", settings.elite_speed_percent) ||
+               parse_setting_value(line, "LICCFG_INITIAL_SPAWN_DELAY_MS", settings.initial_spawn_delay_ms) ||
+               parse_setting_value(line, "LICCFG_ENEMY_INITIAL_CONTACT_COOLDOWN_MS", settings.enemy_initial_contact_cooldown_ms) ||
+               parse_setting_value(line, "LICCFG_PLAYER_DASH_DISTANCE_CENTI", settings.player_dash_distance_centi) ||
+               parse_setting_value(line, "LICCFG_PLAYER_DASH_DURATION_MS", settings.player_dash_duration_ms) ||
+               parse_setting_value(line, "LICCFG_DASH_INVULNERABILITY_MS", settings.dash_invulnerability_ms) ||
+               parse_setting_value(line, "LICCFG_ENEMY_CONTACT_DAMAGE", settings.enemy_contact_damage) ||
+               parse_setting_value(line, "LICCFG_ELITE_CONTACT_DAMAGE", settings.elite_contact_damage) ||
+               parse_setting_value(line, "LICCFG_ENEMY_CONTACT_RANGE_CENTI", settings.enemy_contact_range_centi) ||
+               parse_setting_value(line, "LICCFG_ENEMY_CONTACT_COOLDOWN_MS", settings.enemy_contact_cooldown_ms) ||
+               parse_setting_value(line, "LICCFG_PLAYER_HIT_INVULNERABILITY_MS", settings.player_hit_invulnerability_ms) ||
+               parse_setting_value(line, "LICCFG_PROJECTILE_SPEED_CENTI", settings.projectile_speed_centi) ||
+               parse_setting_value(line, "LICCFG_PROJECTILE_LIFETIME_MS", settings.projectile_lifetime_ms) ||
+               parse_setting_value(line, "LICCFG_PROJECTILE_HIT_RADIUS_CENTI", settings.projectile_hit_radius_centi) ||
+               parse_setting_value(line, "LICCFG_NO_TARGET_FIRE_DELAY_MS", settings.no_target_fire_delay_ms) ||
+               parse_setting_value(line, "LICCFG_EXPERIENCE_ATTRACTION_RANGE_CENTI", settings.experience_attraction_range_centi) ||
+               parse_setting_value(line, "LICCFG_EXPERIENCE_ATTRACTION_SPEED_CENTI", settings.experience_attraction_speed_centi) ||
+               parse_setting_value(line, "LICCFG_EXPERIENCE_COLLECT_RANGE_CENTI", settings.experience_collect_range_centi));
     }
 }
 
