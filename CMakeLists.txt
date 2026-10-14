@@ -5,7 +5,8 @@ project(LICEngine VERSION 0.1.0 DESCRIPTION "LIC Engine - modular C++ game engin
 include(CTest)
 option(LIC_ENGINE_BUILD_TESTS "Build LIC Engine tests" ON)
 option(LIC_ENGINE_WARNINGS_AS_ERRORS "Treat project warnings as errors" OFF)
-option(LIC_ENGINE_ENABLE_VULKAN "Build the native Vulkan viewport when Vulkan, GLFW, and glslc are available" ON)
+option(LIC_ENGINE_ENABLE_VULKAN "Build the native Vulkan viewport when Vulkan and glslc are available" ON)
+option(LIC_ENGINE_FETCH_GLFW "Fetch GLFW 3.4 if it is not installed and the Vulkan backend can be built" OFF)
 
 add_library(lic_build_options INTERFACE)
 target_compile_features(lic_build_options INTERFACE cxx_std_23)
@@ -37,8 +38,26 @@ if(LIC_ENGINE_ENABLE_VULKAN)
     find_program(LIC_GLSLC_EXECUTABLE NAMES glslc
         HINTS "$ENV{VULKAN_SDK}/Bin" "$ENV{VULKAN_SDK}/bin")
 
+    if(Vulkan_FOUND AND LIC_GLSLC_EXECUTABLE
+       AND NOT TARGET glfw AND NOT TARGET glfw3::glfw
+       AND LIC_ENGINE_FETCH_GLFW)
+        include(FetchContent)
+        set(GLFW_BUILD_DOCS OFF CACHE BOOL "Disable GLFW documentation builds" FORCE)
+        set(GLFW_BUILD_TESTS OFF CACHE BOOL "Disable GLFW test builds" FORCE)
+        set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "Disable GLFW example builds" FORCE)
+        set(GLFW_INSTALL OFF CACHE BOOL "Do not install GLFW from the nested build" FORCE)
+        set(BUILD_SHARED_LIBS OFF)
+        FetchContent_Declare(
+            glfw
+            GIT_REPOSITORY https://github.com/glfw/glfw.git
+            GIT_TAG 3.4
+            GIT_SHALLOW TRUE
+        )
+        FetchContent_MakeAvailable(glfw)
+    endif()
+
     if(Vulkan_FOUND AND (TARGET glfw OR TARGET glfw3::glfw) AND LIC_GLSLC_EXECUTABLE)
-        set(LIC_SHADER_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/shaders")
+        set(LIC_SHADER_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/renderer_shaders")
         set(LIC_VERTEX_SPIRV "${LIC_SHADER_OUTPUT_DIR}/viewport.vert.spv")
         set(LIC_FRAGMENT_SPIRV "${LIC_SHADER_OUTPUT_DIR}/viewport.frag.spv")
 
@@ -66,7 +85,6 @@ if(LIC_ENGINE_ENABLE_VULKAN)
         add_library(LIC::Renderer ALIAS lic_renderer)
         add_dependencies(lic_renderer lic_renderer_shaders)
         target_include_directories(lic_renderer PUBLIC engine/renderer/include)
-        target_compile_definitions(lic_renderer PRIVATE LIC_SHADER_DIR=\"${LIC_SHADER_OUTPUT_DIR}\")
         if(TARGET glfw)
             target_link_libraries(lic_renderer PUBLIC Vulkan::Vulkan glfw)
         else()
@@ -75,6 +93,12 @@ if(LIC_ENGINE_ENABLE_VULKAN)
         target_link_libraries(lic_renderer PUBLIC lic_build_options)
         target_compile_definitions(lic_editor PRIVATE LIC_HAS_VULKAN_VIEWPORT=1)
         target_link_libraries(lic_editor PRIVATE LIC::Renderer)
+        add_custom_command(TARGET lic_editor POST_BUILD
+            COMMAND "${CMAKE_COMMAND}" -E copy_directory
+                    "${LIC_SHADER_OUTPUT_DIR}" "$<TARGET_FILE_DIR:lic_editor>/shaders"
+            VERBATIM
+            COMMENT "Copy LIC viewport shaders beside the executable"
+        )
         message(STATUS "LIC Engine Vulkan viewport: enabled (GLFW + Vulkan + glslc)")
     else()
         message(STATUS "LIC Engine Vulkan viewport: disabled (requires Vulkan dev files, GLFW 3, and glslc)")
