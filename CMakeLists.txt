@@ -5,7 +5,7 @@ project(LICEngine VERSION 0.1.0 DESCRIPTION "LIC Engine - modular C++ game engin
 include(CTest)
 option(LIC_ENGINE_BUILD_TESTS "Build LIC Engine tests" ON)
 option(LIC_ENGINE_WARNINGS_AS_ERRORS "Treat project warnings as errors" OFF)
-option(LIC_ENGINE_ENABLE_VULKAN "Build the native Vulkan viewport when Vulkan SDK and GLFW are available" ON)
+option(LIC_ENGINE_ENABLE_VULKAN "Build the native Vulkan viewport when Vulkan, GLFW, and glslc are available" ON)
 
 add_library(lic_build_options INTERFACE)
 target_compile_features(lic_build_options INTERFACE cxx_std_23)
@@ -31,15 +31,42 @@ target_link_libraries(lic_core PUBLIC lic_build_options)
 add_executable(lic_editor editor/src/main.cpp)
 target_link_libraries(lic_editor PRIVATE LIC::Core lic_build_options)
 
-set(LIC_ENGINE_VULKAN_AVAILABLE OFF)
 if(LIC_ENGINE_ENABLE_VULKAN)
     find_package(Vulkan QUIET)
     find_package(glfw3 CONFIG QUIET)
+    find_program(LIC_GLSLC_EXECUTABLE NAMES glslc
+        HINTS "$ENV{VULKAN_SDK}/Bin" "$ENV{VULKAN_SDK}/bin")
 
-    if(Vulkan_FOUND AND (TARGET glfw OR TARGET glfw3::glfw))
+    if(Vulkan_FOUND AND (TARGET glfw OR TARGET glfw3::glfw) AND LIC_GLSLC_EXECUTABLE)
+        set(LIC_SHADER_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/shaders")
+        set(LIC_VERTEX_SPIRV "${LIC_SHADER_OUTPUT_DIR}/viewport.vert.spv")
+        set(LIC_FRAGMENT_SPIRV "${LIC_SHADER_OUTPUT_DIR}/viewport.frag.spv")
+
+        add_custom_command(
+            OUTPUT "${LIC_VERTEX_SPIRV}"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${LIC_SHADER_OUTPUT_DIR}"
+            COMMAND "${LIC_GLSLC_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/engine/renderer/shaders/viewport.vert"
+                    -o "${LIC_VERTEX_SPIRV}"
+            DEPENDS engine/renderer/shaders/viewport.vert
+            VERBATIM
+            COMMENT "Compile LIC viewport vertex shader"
+        )
+        add_custom_command(
+            OUTPUT "${LIC_FRAGMENT_SPIRV}"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${LIC_SHADER_OUTPUT_DIR}"
+            COMMAND "${LIC_GLSLC_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/engine/renderer/shaders/viewport.frag"
+                    -o "${LIC_FRAGMENT_SPIRV}"
+            DEPENDS engine/renderer/shaders/viewport.frag
+            VERBATIM
+            COMMENT "Compile LIC viewport fragment shader"
+        )
+        add_custom_target(lic_renderer_shaders DEPENDS "${LIC_VERTEX_SPIRV}" "${LIC_FRAGMENT_SPIRV}")
+
         add_library(lic_renderer engine/renderer/src/vulkan_viewport.cpp)
         add_library(LIC::Renderer ALIAS lic_renderer)
+        add_dependencies(lic_renderer lic_renderer_shaders)
         target_include_directories(lic_renderer PUBLIC engine/renderer/include)
+        target_compile_definitions(lic_renderer PRIVATE LIC_SHADER_DIR=\"${LIC_SHADER_OUTPUT_DIR}\")
         if(TARGET glfw)
             target_link_libraries(lic_renderer PUBLIC Vulkan::Vulkan glfw)
         else()
@@ -48,10 +75,9 @@ if(LIC_ENGINE_ENABLE_VULKAN)
         target_link_libraries(lic_renderer PUBLIC lic_build_options)
         target_compile_definitions(lic_editor PRIVATE LIC_HAS_VULKAN_VIEWPORT=1)
         target_link_libraries(lic_editor PRIVATE LIC::Renderer)
-        set(LIC_ENGINE_VULKAN_AVAILABLE ON)
-        message(STATUS "LIC Engine Vulkan viewport: enabled")
+        message(STATUS "LIC Engine Vulkan viewport: enabled (GLFW + Vulkan + glslc)")
     else()
-        message(STATUS "LIC Engine Vulkan viewport: disabled (install Vulkan SDK/loader development files and GLFW to enable)")
+        message(STATUS "LIC Engine Vulkan viewport: disabled (requires Vulkan dev files, GLFW 3, and glslc)")
     endif()
 else()
     message(STATUS "LIC Engine Vulkan viewport: disabled by LIC_ENGINE_ENABLE_VULKAN=OFF")
