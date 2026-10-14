@@ -1,0 +1,116 @@
+# LIC Engine
+
+**A C++23 game engine focused on fast iteration, a clean editor, and a practical runtime.**
+
+LIC Engine aims to combine the approachable scene workflow of Godot, the level-design and runtime mindset of Source, and the rendering ambition of Unreal—without copying their interfaces or architecture.
+
+> **Project status:** architecture and foundation stage. Features described below are goals, not claims that they are already implemented. The first milestone is a small, buildable engine that opens a real 3D scene, renders it, and can run the same scene outside the editor.
+
+## Design principles
+
+- **A real engine, not a demo:** editor, runtime, asset pipeline, and sample game evolve together.
+- **C++23 + CMake:** readable native code and reproducible builds.
+- **Modular core:** rendering, world, physics, audio, input, assets, and platform services have clear boundaries.
+- **Desktop first, portable by design:** Windows and Linux first; Android after the platform and renderer interfaces are stable. Keep platform-specific APIs out of the core.
+- **Useful editor UX:** dark, restrained interface; large scene viewport; hierarchy and inspector; visible asset browser; clear play/stop controls; useful diagnostics.
+- **Measured performance:** frame-time and memory metrics, profiling hooks, and test scenes from the beginning.
+- **Honest status:** document what works, what is experimental, and what is planned.
+
+## Target editor layout
+
+```text
+┌──────────────────────────────────────────────────────────────────────────┐
+│ LIC Engine   Project  Scene  Assets  Build             Play  Pause  Stop │
+├──────────────┬──────────────────────────────────────┬────────────────────┤
+│ Scene        │                                      │ Inspector          │
+│ Hierarchy    │          3D Scene View               │ Transform          │
+│              │     gizmos · grid · camera           │ Components         │
+├──────────────┴──────────────────────────────────────┴────────────────────┤
+│ Assets / Console / Problems / Profiler / Build output                    │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+The editor should be information-dense but calm: neutral dark surfaces, readable typography, restrained accent color, consistent spacing, and no decorative gradients or oversized dashboard cards. Panels should be resizable and remember their layout. The viewport must remain the visual focus.
+
+## Planned architecture
+
+```text
+LIC Editor ───────────────┐
+                          ├── LIC Runtime ── World / ECS / Scene / Events
+Standalone Game Runner ───┘        │
+                                   ├── Renderer (Vulkan first)
+                                   ├── Physics (Jolt adapter)
+                                   ├── Audio (miniaudio adapter)
+                                   ├── Input
+                                   ├── Asset database and import pipeline
+                                   ├── Animation
+                                   └── Platform abstraction
+```
+
+### Initial technology direction
+
+| Area | Initial choice | Notes |
+|---|---|---|
+| Language/build | C++23, CMake | Keep compiler and dependency requirements documented |
+| Graphics | Vulkan | Start with a small forward renderer; add render graph and advanced effects only after the basics are reliable |
+| Editor UI | Dear ImGui with docking | Editor tooling, not the in-game UI system |
+| Math | GLM | Centralize coordinate-system and unit conventions |
+| World model | Entity-component-system with stable entity handles | Avoid exposing storage details throughout the engine |
+| Physics | Jolt Physics behind an adapter | Fixed simulation step and explicit collision layers |
+| Audio | miniaudio behind an adapter | Keep audio optional for headless tests |
+| Model format | glTF 2.0 | Document supported materials, textures, skins, and animation features |
+| Assets | GUID-based asset database | Stable references, import settings, dependency tracking, and useful error messages |
+| Testing | CTest | Unit tests plus a small deterministic smoke-test scene |
+
+These are initial choices, not reasons to couple every module permanently to one vendor. Third-party licenses must be reviewed and recorded before dependencies are added.
+
+## Roadmap
+
+1. **Foundation:** repository conventions, CMake targets, logging, assertions, configuration, platform/window layer, and CI build checks.
+2. **First visible scene:** Vulkan initialization, swapchain, camera, depth buffer, a lit mesh, resize handling, and a reproducible sample scene.
+3. **World and assets:** entity/component model, transforms, scene serialization, asset IDs, glTF import, and error reporting.
+4. **Editor workflow:** viewport navigation, hierarchy, inspector, selection, transform gizmos, asset browser, console, and play/stop.
+5. **Gameplay systems:** input mapping, physics, audio, animation, prefabs, and a documented C++ game-module interface.
+6. **Shipping workflow:** standalone runtime, project packaging, profiling, automated tests, Windows/Linux release builds, then Android feasibility and support.
+7. **Advanced rendering:** PBR materials, shadows, image-based lighting, post-processing, instancing, GPU profiling, and scalable quality settings.
+
+The order is deliberate: each stage must build and run before the next adds complexity. Feature names alone do not count as completion.
+
+## Repository structure target
+
+```text
+lic_engine/
+├── CMakeLists.txt
+├── CMakePresets.json
+├── README.md
+├── LICENSE
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── ROADMAP.md
+│   └── CONTRIBUTING.md
+├── engine/
+│   ├── core/
+│   ├── platform/
+│   ├── renderer/
+│   ├── world/
+│   ├── assets/
+│   ├── physics/
+│   ├── audio/
+│   └── runtime/
+├── editor/
+├── tools/
+├── examples/
+│   └── sandbox/
+├── tests/
+└── third_party/
+```
+
+Folders should be introduced with their first real implementation rather than filled with empty placeholders.
+
+## Build and validation
+
+Build instructions will be added alongside the first working CMake targets. Every milestone should include exact configure/build/test commands and report which commands were actually run. A successful documentation commit must never be presented as a working renderer or editor.
+
+## Contributing
+
+See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [docs/ROADMAP.md](docs/ROADMAP.md). Prefer small modules, clear ownership, explicit error handling, and tests for behavior that can regress.
