@@ -39,10 +39,11 @@ int main(int argc, char** argv) {
     }
 
 #ifdef LIC_HAS_VULKAN_VIEWPORT
-    // Launch the graphical viewport when the executable is opened without CLI arguments.
-    return lic::renderer::run_vulkan_viewport(std::filesystem::absolute(std::filesystem::path(argv[0])));
-#else
+    // Launch the graphical viewport only when the executable is opened without CLI arguments.
+    if (argc == 1) {
+        return lic::renderer::run_vulkan_viewport(std::filesystem::absolute(std::filesystem::path(argv[0])));
+    }
+#endif
     lic::core::print_build_information(std::cout);
     return 0;
-#endif
 }
