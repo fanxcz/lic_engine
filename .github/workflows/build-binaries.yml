@@ -51,11 +51,11 @@ jobs:
           }
           Copy-Item "README.md" "$package/README.md"
           Copy-Item "docs/BUILDING.md" "$package/BUILDING.md"
-          @'
-          @echo off
-          cd /d "%~dp0"
-          lic_editor.exe %*
-          '@ | Set-Content -Encoding ascii "$package/run-lic-engine.bat"
+          Set-Content -Encoding ascii "$package/run-lic-engine.bat" -Value @(
+            "@echo off",
+            'cd /d "%~dp0"',
+            "lic_editor.exe %*"
+          )
           & "$package/lic_editor.exe" --version
           if ($LASTEXITCODE -ne 0) { throw "The packaged executable failed its version smoke test." }
           New-Item -ItemType Directory -Force -Path dist | Out-Null
