@@ -56,8 +56,10 @@ try {
 
     Write-Host "Watching workflow run $runId. The script will stop if a platform build fails." -ForegroundColor Cyan
     & gh run watch $runId --repo $githubRepo --exit-status
-    if ($LASTEXITCODE -ne 0) {
-        throw "At least one platform build failed. Inspect the run with: gh run view $runId --repo $githubRepo --web"
+    $workflowFailed = ($LASTEXITCODE -ne 0)
+    if ($workflowFailed) {
+        Write-Warning "At least one platform job failed. Successful platform artifacts will still be downloaded."
+        Write-Host "Inspect the failed job: gh run view $runId --repo $githubRepo --web" -ForegroundColor Yellow
     }
 
     $downloadRoot = Join-Path $repoRoot "dist/platform-builds"
@@ -89,7 +91,16 @@ try {
         Where-Object { $_.Extension -in @(".zip", ".gz") } |
         Select-Object FullName, Length |
         Format-Table -AutoSize
-    Write-Host "Note: macOS package is currently a core CLI build; Linux and Windows packages target the Vulkan viewport."
+    $windowsPackage = Join-Path $downloadRoot "lic-engine-windows-x64.zip"
+    if (-not (Test-Path $windowsPackage)) {
+        throw "The Windows job did not provide its archive. Check the run: gh run view $runId --repo $githubRepo --web"
+    }
+
+    Write-Host "Windows package is ready: $windowsPackage" -ForegroundColor Green
+    if ($workflowFailed) {
+        Write-Warning "Some other platform failed; the successful Windows package is still available above."
+    }
+    Write-Host "Note: macOS package is currently a core CLI build; Windows/Linux packages target the Vulkan viewport."
 }
 finally {
     Pop-Location
