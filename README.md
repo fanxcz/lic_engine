@@ -10,7 +10,7 @@ LIC Engine aims to combine the approachable scene workflow of Godot, the level-d
 
 **[Download LIC Engine for Windows — EXE](https://github.com/fanxcz/lic_engine/releases/download/continuous/lic_editor.exe)** · **[Download the complete Windows package (EXE + Vulkan shaders)](https://github.com/fanxcz/lic_engine/releases/download/continuous/lic-engine-windows-x64.zip)** · [All build results](https://github.com/fanxcz/lic_engine/actions/workflows/build-binaries.yml)
 
-The standalone `lic_editor.exe` is provided for quick access, but the graphical viewport needs the adjacent `shaders\` directory and a Vulkan-capable graphics driver. For normal use, download and extract the complete ZIP, then double-click `run-lic-engine.bat`. The continuous download is refreshed by the **Build platform binaries** workflow; if the link is not available yet, run the workflow once using the steps in [Windows 11 build instructions](docs/BUILDING.md).
+The standalone `lic_editor.exe` is provided for quick access, but the graphical viewport needs the adjacent `shaders\` directory and a Vulkan-capable graphics driver. For normal use, download and extract the complete ZIP, then double-click `run-lic-engine.bat`. The continuous download is refreshed automatically after a successful build from `main` and when the workflow is started manually. If GitHub Actions has not completed its first successful run yet, open [Build platform binaries](https://github.com/fanxcz/lic_engine/actions/workflows/build-binaries.yml). The full package is the recommended way to run the graphical viewport.
 
 ## Design principles
 
@@ -82,7 +82,7 @@ The repository now includes a build workflow for downloadable native executables
 
 On Windows 11, run `tools/build-windows.ps1` to build and package the local executable. To dispatch native builds on GitHub Actions and download all platform packages, run `tools/build-all-platforms.ps1` from an authenticated GitHub CLI session. Full steps are in [docs/BUILDING.md](docs/BUILDING.md).
 
-The manual platform workflow updates a rolling preview release tagged `continuous`, with direct links to the Windows executable and complete archive. Pushing a version tag beginning with `v` also publishes a versioned GitHub Release. Android APK and Web/WASM builds are not available yet: those targets need platform entry points and renderer integration first.
+Successful `main` builds and manual platform runs update the rolling preview release tagged `continuous`, with direct links to the Windows executable and complete archive. Pushing a version tag beginning with `v` also publishes a versioned GitHub Release. Android APK and Web/WASM builds are not available yet: those targets need platform entry points and renderer integration first.
 
 ## Roadmap
 
