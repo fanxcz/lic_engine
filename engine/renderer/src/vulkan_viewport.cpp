@@ -9,6 +9,8 @@
 #include <iostream>
 #include <limits>
 #include <optional>
+#include <ranges>
+#include <string_view>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -567,6 +569,11 @@ private:
         }
         swapchainImages_.clear();
         imageFences_.clear();
+        for (VkSemaphore semaphore : renderFinished_) {
+            if (semaphore != VK_NULL_HANDLE) {
+                vkDestroySemaphore(device_, semaphore, nullptr);
+            }
+        }
         renderFinished_.clear();
     }
 
@@ -574,11 +581,6 @@ private:
         if (device_ != VK_NULL_HANDLE) {
             vkDeviceWaitIdle(device_);
             cleanup_swapchain();
-            for (VkSemaphore semaphore : renderFinished_) {
-                if (semaphore != VK_NULL_HANDLE) {
-                    vkDestroySemaphore(device_, semaphore, nullptr);
-                }
-            }
             for (std::size_t i = 0; i < imageAvailable_.size(); ++i) {
                 if (imageAvailable_[i] != VK_NULL_HANDLE) {
                     vkDestroySemaphore(device_, imageAvailable_[i], nullptr);
