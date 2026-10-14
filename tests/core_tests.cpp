@@ -176,6 +176,50 @@ void test_scene_serialization() {
     std::filesystem::remove_all(folder, ignored);
 }
 
+void test_legacy_scene_compatibility() {
+    const auto folder = std::filesystem::temp_directory_path() / "lic-engine-legacy-scene-tests";
+    const auto path = folder / "v1.licscene";
+    std::error_code ignored;
+    std::filesystem::remove_all(folder, ignored);
+    std::filesystem::create_directories(folder);
+    {
+        std::ofstream scene(path, std::ios::binary | std::ios::trunc);
+        scene << "LICSCENE 1\nnodes 1\n"
+                 "node 1 \"Legacy cube\" 0 0 0 0 0 0 1 1 1 0.1 0.2 0.3 1 1\n";
+    }
+    lic::world::World loaded;
+    lic::world::load_scene(loaded, path);
+    expect(loaded.entity_count() == 1, "legacy LICSCENE v1 should remain loadable");
+    loaded.each<lic::world::NodeName>([&](lic::world::Entity entity, const lic::world::NodeName& name) {
+        if (name.value != "Legacy cube") return;
+        const auto& material = loaded.get<lic::world::Appearance>(entity);
+        expect(material.color[0] == 0.1F, "legacy scenes should preserve base color");
+        expect(material.metallic == 0.0F, "legacy scenes should default metallic to zero");
+        expect(material.roughness == 0.68F, "legacy scenes should receive the default roughness");
+        expect(material.emission_strength == 0.0F, "legacy scenes should default emission to zero");
+    });
+    std::filesystem::remove_all(folder, ignored);
+}
+
+void test_gameplay_settings_validation() {
+    lic::game::Voidbound game;
+    lic::game::ScriptSettings settings;
+    settings.player_health = 900;
+    settings.player_speed = -5;
+    settings.enemy_spawn_cap = 1000;
+    settings.elite_every_n = 0;
+    settings.projectile_lifetime_ms = 999999;
+    game.apply_script_settings(settings);
+    const auto validated = game.script_settings();
+    expect(validated.player_health == 500, "NEXUS health settings should be clamped");
+    expect(validated.player_speed == 80, "NEXUS movement speed should be clamped");
+    expect(validated.enemy_spawn_cap == 60, "NEXUS wave cap should be clamped");
+    expect(validated.elite_every_n == 1, "elite cadence must never divide by zero");
+    expect(validated.projectile_lifetime_ms == 10000, "projectile lifetime should be clamped");
+    game.start_run();
+    expect(game.max_health() == 500.0F, "validated health should drive the actual run");
+}
+
 void test_material_resources() {
     const auto folder = std::filesystem::temp_directory_path() / "lic-engine-material-tests";
     const auto path = folder / "Test Material.licmat";
@@ -248,8 +292,10 @@ int main() {
     test_version();
     test_world_entity_lifecycle();
     test_scene_serialization();
+    test_legacy_scene_compatibility();
     test_material_resources();
+    test_gameplay_settings_validation();
     test_voidbound_gameplay();
-    std::cout << "LIC Engine core, world, scene, materials and gameplay tests passed.\n";
+    std::cout << "LIC Engine core, world, scenes, materials, NEXUS settings and gameplay tests passed.\n";
     return EXIT_SUCCESS;
 }
