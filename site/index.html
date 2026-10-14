@@ -1,57 +1,79 @@
 <!doctype html>
-<html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#111210">
-<meta name="description" content="LIC Engine is a native C++23 game-engine foundation with a Vulkan viewport and tested entity-component world module.">
-<title>LIC Engine — Native C++23 game engine</title><link rel="stylesheet" href="./styles.css">
-</head><body>
-<header class="topbar">
-<a class="brand" href="#top" aria-label="LIC Engine home"><span class="brand-mark">L</span><span>LIC <small>ENGINE</small></span></a>
-<nav aria-label="Main navigation"><a href="#status">Status</a><a href="#builds">Builds</a><a href="https://github.com/fanxcz/lic_engine/blob/main/docs/BUILDING.md">Docs ↗</a></nav>
-<a class="header-link" href="https://github.com/fanxcz/lic_engine">Source ↗</a>
-</header>
-<main id="top">
-<section class="hero">
-<div class="hero-copy">
-<p class="eyebrow"><span class="live-dot"></span> VERSION 0.1.0 <span class="slash">/</span> EARLY FOUNDATION</p>
-<h1>A native engine.<br><span>Still being built.</span></h1>
-<p class="lead">LIC Engine is a native C++23 project with a Vulkan scene editor. VOIDBOUND is the first playable game, and NEXUS is built in for editing and compiling game-rule scripts.</p>
-<div class="actions"><a class="button button-primary" href="https://github.com/fanxcz/lic_engine/releases/download/continuous/lic-engine-windows-x64.zip">Download Windows build <span aria-hidden="true">↓</span></a><a class="button button-quiet" href="https://github.com/fanxcz/lic_engine">View source ↗</a></div>
-<p class="requirements">Windows 11 · x64 · Vulkan-capable driver · Extract the full ZIP</p>
-        <p class="requirements">The package includes <code>lic_editor.exe</code> and <code>voidbound.exe</code>.</p>
-</div>
-<div class="viewport" role="img" aria-label="Wireframe cube representing the current Vulkan test scene">
-<div class="viewport-head"><span>SCENE / DEFAULT</span><span class="viewport-state">VULKAN / TEST SCENE</span></div>
-<div class="viewport-canvas"><div class="axis axis-x"></div><div class="axis axis-y"></div>
-<svg class="cube" viewBox="0 0 360 280" aria-hidden="true">
-<g class="grid-lines"><path d="M22 222H338 M42 204H318 M66 186H294 M91 168H269 M117 150H243 M144 132H216"/><path d="M45 118L180 258 M89 118L204 258 M133 118L228 258 M177 118L252 258 M221 118L276 258 M265 118L300 258 M309 118L324 258"/></g>
-<g class="cube-lines"><path d="M180 52L269 101L180 151L91 101Z"/><path d="M91 101V199L180 250L269 199V101"/><path d="M180 151V250"/><path d="M91 199L180 151L269 199"/></g>
-<g class="cube-points"><circle cx="180" cy="52" r="3"/><circle cx="269" cy="101" r="3"/><circle cx="180" cy="151" r="3"/><circle cx="91" cy="101" r="3"/><circle cx="91" cy="199" r="3"/><circle cx="180" cy="250" r="3"/><circle cx="269" cy="199" r="3"/></g>
-</svg>
-<span class="coordinate coord-a">X <i>1.00</i></span><span class="coordinate coord-b">Y <i>1.00</i></span><span class="coordinate coord-c">Z <i>1.00</i></span>
-</div><div class="viewport-foot"><span>VULKAN / GLFW</span><span>TEST GEOMETRY</span></div>
-</div>
-</section>
-<section class="status-strip" id="status" aria-label="Project status">
-<div><span class="strip-label">LANGUAGE</span><strong>C++23</strong></div><div><span class="strip-label">RENDERER</span><strong>Vulkan</strong></div><div><span class="strip-label">WORLD</span><strong>ECS foundation</strong></div><div><span class="strip-label">REPOSITORY</span><strong>Public</strong></div>
-</section>
-<section class="builds section" id="builds">
-<div class="section-heading"><div><p class="eyebrow">DOWNLOADS</p><h2>Builds you can run.</h2></div><a href="https://github.com/fanxcz/lic_engine/actions/workflows/build-binaries.yml">Build logs ↗</a></div>
-<div class="build-list">
-<div class="build-row"><div class="platform-icon">W</div><div class="build-name"><strong>Windows x64</strong><span>Vulkan viewport · ZIP package</span></div><span class="build-kind">Desktop</span><a class="download-link" href="https://github.com/fanxcz/lic_engine/releases/download/continuous/lic-engine-windows-x64.zip">Download ↓</a></div>
-<div class="build-row"><div class="platform-icon">L</div><div class="build-name"><strong>Linux x64</strong><span>Vulkan viewport · TAR.GZ</span></div><span class="build-kind">Desktop</span><a class="download-link" href="https://github.com/fanxcz/lic_engine/releases/download/continuous/lic-engine-linux-x64.tar.gz">Download ↓</a></div>
-<div class="build-row"><div class="platform-icon">M</div><div class="build-name"><strong>macOS ARM64</strong><span>Core CLI only · TAR.GZ</span></div><span class="build-kind">Core</span><a class="download-link" href="https://github.com/fanxcz/lic_engine/releases/download/continuous/lic-engine-macos-arm64-core.tar.gz">Download ↓</a></div>
-</div><p class="small-note">Android and Web builds are not available yet. Extract the complete Windows package and launch it with <code>run-lic-engine.bat</code>.</p>
-</section>
-<section class="section work" id="work">
-<div class="section-heading"><div><p class="eyebrow">IN THE REPOSITORY</p><h2>Current scope.</h2></div><a href="https://github.com/fanxcz/lic_engine/blob/main/docs/ROADMAP.md">Roadmap ↗</a></div>
-<div class="work-grid">
-<article><span class="index">01</span><h3>VOIDBOUND</h3><p>Survival arena, movement, dash, pulse fire, enemy waves, score, XP and upgrade choices.</p></article>
-<article><span class="index">02</span><h3>Scene editor</h3><p>Scene tree, object inspector, primitive transforms/colors, and scene save/load.</p></article>
-<article><span class="index">03</span><h3>Project workflow</h3><p>Project files, output console, release packages and automated gameplay tests.</p></article>
-</div>
-<div class="scope-note"><span class="scope-mark">!</span><p><strong>Not a full editor yet.</strong> Mesh import, transform hierarchy, saved scenes, camera controls, and editor panels remain in development. Track actual progress in the repository roadmap.</p></div>
-</section>
-</main>
-<footer class="footer"><a class="brand footer-brand" href="#top"><span class="brand-mark">L</span><span>LIC <small>ENGINE</small></span></a><span>C++23 · Open development</span><a href="https://github.com/fanxcz/lic_engine">github.com/fanxcz/lic_engine ↗</a></footer>
-</body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#171819">
+  <meta name="description" content="LIC Engine is a native C++23 and Vulkan game-engine project with NEXUS gameplay scripts and reusable LICMAT materials.">
+  <title>LIC Engine</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="LIC Engine home">LIC <span>ENGINE</span></a>
+    <nav aria-label="Main navigation">
+      <a href="#downloads">Downloads</a>
+      <a href="#features">Features</a>
+      <a href="https://github.com/fanxcz/lic_engine/blob/main/docs/BUILDING.md">Docs</a>
+      <a href="https://github.com/fanxcz/lic_engine">GitHub ↗</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="intro">
+      <p class="kicker">OPEN SOURCE · EARLY DEVELOPMENT</p>
+      <h1>LIC Engine</h1>
+      <p class="intro-copy">A native C++23 and Vulkan game-engine project with a scene editor, the VOIDBOUND survival prototype, NEXUS gameplay rules, and reusable material assets.</p>
+      <div class="intro-links">
+        <a class="primary-link" href="https://github.com/fanxcz/lic_engine/releases/download/continuous/lic-engine-windows-x64.zip">Download Windows build <span>↓</span></a>
+        <a href="https://github.com/fanxcz/lic_engine">Browse source ↗</a>
+      </div>
+      <p class="small">Extract the whole archive. Keep executables, runtime files, shaders and assets together.</p>
+    </section>
+
+    <section class="section" id="downloads">
+      <div class="section-title">
+        <h2>Downloads</h2>
+        <a href="https://github.com/fanxcz/lic_engine/actions/workflows/build-binaries.yml">Build history ↗</a>
+      </div>
+      <div class="download-list">
+        <div class="download-row">
+          <div><strong>Windows x64</strong><p>Vulkan editor · VOIDBOUND · NEXUS compiler</p></div>
+          <a href="https://github.com/fanxcz/lic_engine/releases/download/continuous/lic-engine-windows-x64.zip">ZIP ↓</a>
+        </div>
+        <div class="download-row">
+          <div><strong>Linux x64</strong><p>Vulkan editor · VOIDBOUND · NEXUS compiler</p></div>
+          <a href="https://github.com/fanxcz/lic_engine/releases/download/continuous/lic-engine-linux-x64.tar.gz">TAR.GZ ↓</a>
+        </div>
+        <div class="download-row">
+          <div><strong>macOS Apple Silicon</strong><p>Core CLI build; no graphical editor package yet</p></div>
+          <a href="https://github.com/fanxcz/lic_engine/releases/download/continuous/lic-engine-macos-arm64-core.tar.gz">TAR.GZ ↓</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <h2>Included</h2>
+      <div class="feature-list">
+        <article><h3>Scene editor</h3><p>Entity hierarchy, transforms, scene save/load, viewport controls and a compact inspector.</p></article>
+        <article><h3>VOIDBOUND</h3><p>3D arena-survival prototype with enemy waves, movement, dash, projectiles, XP and upgrades.</p></article>
+        <article><h3>NEXUS scripting</h3><p>Edit and compile <code>GameRules.nx</code> from the editor. Balance values control waves, enemies, scoring and upgrades.</p></article>
+        <article><h3>LICMAT materials</h3><p>Reusable, versioned text materials with base color, metallic, roughness and emission. Scene files preserve surface settings.</p></article>
+      </div>
+    </section>
+
+    <section class="section project-status">
+      <h2>Project status</h2>
+      <p>The Vulkan viewport currently renders primitive cube geometry. LICMAT surface parameters work with that renderer; imported glTF models, texture maps, full PBR lighting, general physics, and mobile/Web packages are still in development.</p>
+      <p class="inline-links"><a href="https://github.com/fanxcz/lic_engine/blob/main/docs/ROADMAP.md">Roadmap ↗</a><a href="https://github.com/fanxcz/lic_engine/blob/main/docs/NEXUS_INTEGRATION.md">NEXUS guide ↗</a><a href="https://github.com/fanxcz/lic_engine/blob/main/docs/MATERIAL_FORMAT.md">Material format ↗</a></p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <a class="brand" href="#top">LIC <span>ENGINE</span></a>
+    <span>C++23 · Vulkan · NEXUS</span>
+    <a href="https://github.com/fanxcz/lic_engine">fanxcz/lic_engine ↗</a>
+  </footer>
+</body>
+</html>
