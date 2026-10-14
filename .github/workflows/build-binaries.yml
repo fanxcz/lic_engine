@@ -166,14 +166,46 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Update rolling download tag for manual builds
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const ref = 'tags/continuous';
+            try {
+              await github.rest.git.getRef({ owner: context.repo.owner, repo: context.repo.repo, ref });
+              await github.rest.git.updateRef({ owner: context.repo.owner, repo: context.repo.repo, ref, sha: context.sha, force: true });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              await github.rest.git.createRef({ owner: context.repo.owner, repo: context.repo.repo, ref: `refs/${ref}`, sha: context.sha });
+            }
+
       - uses: actions/download-artifact@v4
         with:
           pattern: lic-engine-*
           path: release-assets
           merge-multiple: true
 
+      - name: Extract standalone Windows executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f release-assets/lic-engine-windows-x64.zip
+          unzip -p release-assets/lic-engine-windows-x64.zip lic_editor.exe > release-assets/lic_editor.exe
+          test -s release-assets/lic_editor.exe
+          sha256sum release-assets/lic_editor.exe > release-assets/lic_editor.exe.sha256
+
       - name: Publish downloadable binaries
         uses: softprops/action-gh-release@v2
         with:
-          files: release-assets/*
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && 'continuous' || github.ref_name }}
+          prerelease: ${{ github.event_name == 'workflow_dispatch' }}
+          make_latest: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+          files: |
+            release-assets/lic_editor.exe
+            release-assets/lic_editor.exe.sha256
+            release-assets/lic-engine-windows-x64.zip
+            release-assets/lic-engine-linux-x64.tar.gz
+            release-assets/lic-engine-macos-arm64-core.tar.gz
           generate_release_notes: true
+          fail_on_unmatched_files: true
