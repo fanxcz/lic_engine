@@ -10,6 +10,8 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cctype>
+#include <fstream>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
