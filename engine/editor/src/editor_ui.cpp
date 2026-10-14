@@ -139,11 +139,11 @@ void EditorUi::initialize_platform(GLFWwindow* window) {
         std::ofstream sample(script_path_, std::ios::binary | std::ios::trunc);
         sample << "fn main() {\n"
                   "    // These values are read by LIC Engine when a run starts.\n"
-                  "    print(\\"LICCFG_PLAYER_HEALTH=100\\")\n"
-                  "    print(\\"LICCFG_PLAYER_SPEED=230\\")\n"
-                  "    print(\\"LICCFG_ENEMY_SPEED=68\\")\n"
-                  "    print(\\"LICCFG_FIRE_INTERVAL_MS=240\\")\n"
-                  "    print(\\"LICCFG_DASH_COOLDOWN_MS=1350\\")\n"
+                  "    print(\"LICCFG_PLAYER_HEALTH=100\")\n"
+                  "    print(\"LICCFG_PLAYER_SPEED=230\")\n"
+                  "    print(\"LICCFG_ENEMY_SPEED=68\")\n"
+                  "    print(\"LICCFG_FIRE_INTERVAL_MS=240\")\n"
+                  "    print(\"LICCFG_DASH_COOLDOWN_MS=1350\")\n"
                   "}\n";
     }
     load_nexus_script();
