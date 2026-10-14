@@ -17,6 +17,15 @@ try {
         throw "GitHub CLI is not authenticated. Run: gh auth login"
     }
 
+    $previousRunId = $null
+    $previousRaw = & gh run list --workflow build-binaries.yml --branch $Ref --event workflow_dispatch --limit 1 --json databaseId
+    if ($LASTEXITCODE -eq 0) {
+        $previousRuns = @($previousRaw | ConvertFrom-Json)
+        if ($previousRuns.Count -gt 0 -and $previousRuns[0].databaseId) {
+            $previousRunId = [string]$previousRuns[0].databaseId
+        }
+    }
+
     Write-Host "Starting Windows/Linux/macOS builds on GitHub Actions for ref '$Ref'..." -ForegroundColor Cyan
     & gh workflow run build-binaries.yml --ref $Ref
     if ($LASTEXITCODE -ne 0) {
@@ -32,8 +41,11 @@ try {
         }
         $runs = @($raw | ConvertFrom-Json)
         if ($runs.Count -gt 0 -and $runs[0].databaseId) {
-            $runId = [string]$runs[0].databaseId
-            break
+            $candidateId = [string]$runs[0].databaseId
+            if ($candidateId -ne $previousRunId) {
+                $runId = $candidateId
+                break
+            }
         }
     }
 
