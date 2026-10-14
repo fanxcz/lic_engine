@@ -151,6 +151,21 @@ class World final {
             }
         }
 
+        template <typename Function>
+        void each(Function&& function) {
+            // Structural changes to this component pool are not allowed during iteration.
+            for (std::size_t index = 0; index < entities_.size(); ++index) {
+                function(entities_[index], components_[index]);
+            }
+        }
+
+        template <typename Function>
+        void each(Function&& function) const {
+            for (std::size_t index = 0; index < entities_.size(); ++index) {
+                function(entities_[index], components_[index]);
+            }
+        }
+
     private:
         [[nodiscard]] std::optional<std::size_t> dense_index(Entity entity) const noexcept {
             const std::size_t sparse_index = static_cast<std::size_t>(entity.index);
@@ -260,6 +275,23 @@ public:
         }
         auto* component_storage = find_storage<T>();
         return component_storage != nullptr && component_storage->remove(entity);
+    }
+
+    // Do not create/destroy entities or add/remove T while iterating T components.
+    template <typename T, typename Function>
+    void each(Function&& function) {
+        auto* component_storage = find_storage<T>();
+        if (component_storage != nullptr) {
+            component_storage->each(std::forward<Function>(function));
+        }
+    }
+
+    template <typename T, typename Function>
+    void each(Function&& function) const {
+        const auto* component_storage = find_storage<T>();
+        if (component_storage != nullptr) {
+            component_storage->each(std::forward<Function>(function));
+        }
     }
 
 private:
