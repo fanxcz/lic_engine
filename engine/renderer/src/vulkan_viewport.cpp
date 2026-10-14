@@ -481,29 +481,30 @@ private:
         }
     }
 
-    std::vector<char> read_shader(const std::string& filename) const {
+    std::vector<std::uint32_t> read_shader(const std::string& filename) const {
         std::ifstream file(filename, std::ios::ate | std::ios::binary);
         if (!file) {
             throw std::runtime_error("Cannot open compiled shader: " + filename);
         }
         const auto end = file.tellg();
         const auto byteCount = static_cast<std::streamoff>(end);
-        if (byteCount <= 0 || byteCount % 4 != 0) {
+        if (byteCount <= 0 || byteCount % static_cast<std::streamoff>(sizeof(std::uint32_t)) != 0) {
             throw std::runtime_error("Compiled shader has an invalid SPIR-V size: " + filename);
         }
-        std::vector<char> code(static_cast<std::size_t>(byteCount));
+        const auto wordCount = static_cast<std::size_t>(byteCount) / sizeof(std::uint32_t);
+        std::vector<std::uint32_t> code(wordCount);
         file.seekg(0);
-        file.read(code.data(), static_cast<std::streamsize>(code.size()));
+        file.read(reinterpret_cast<char*>(code.data()), static_cast<std::streamsize>(byteCount));
         if (!file) {
             throw std::runtime_error("Failed while reading compiled shader: " + filename);
         }
         return code;
     }
 
-    VkShaderModule create_shader_module(const std::vector<char>& code) const {
+    VkShaderModule create_shader_module(const std::vector<std::uint32_t>& code) const {
         VkShaderModuleCreateInfo createInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
-        createInfo.codeSize = code.size();
-        createInfo.pCode = reinterpret_cast<const std::uint32_t*>(code.data());
+        createInfo.codeSize = code.size() * sizeof(std::uint32_t);
+        createInfo.pCode = code.data();
         VkShaderModule module{};
         check(vkCreateShaderModule(device_, &createInfo, nullptr, &module), "vkCreateShaderModule");
         return module;
