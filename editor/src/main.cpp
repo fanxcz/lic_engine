@@ -26,7 +26,7 @@ int main(int argc, char** argv) {
 #ifdef LIC_HAS_VULKAN_VIEWPORT
             return lic::renderer::run_vulkan_viewport();
 #else
-            std::cerr << "This build has no Vulkan viewport. Install Vulkan development files and GLFW, "
+            std::cerr << "This build has no Vulkan viewport. Install Vulkan development files, GLFW 3, and glslc, "
                          "then reconfigure with LIC_ENGINE_ENABLE_VULKAN=ON.\n";
             return 3;
 #endif
