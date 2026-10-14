@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Added versioned `.licmat` material resources with base color, metallic, roughness and emission settings.
+- Updated scene serialization to v2 while retaining v1 scene loading.
+- Connected metallic, roughness and emission values to the Vulkan surface shader and added material save/load controls in the inspector.
+- Moved VOIDBOUND wave/enemy/XP/score/upgrade balance into the NEXUS `GameRules.nx` source.
+- Replaced the website's decorative mock viewport/cards with a plain responsive project/download page.
+
 - Added VOIDBOUND, a playable arena-survival action game using the LIC Engine world and Vulkan renderer.
 - Added player movement, dash, pulse projectiles, enemy AI, scaling waves, score, health, experience pickups, level-ups and four upgrades.
 - Added game HUD, main menu, pause/restart/game-over overlays and standalone `voidbound` launch targets for Vulkan builds.

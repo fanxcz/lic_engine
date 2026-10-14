@@ -230,8 +230,14 @@ if(LIC_ENGINE_ENABLE_VULKAN)
         add_custom_command(TARGET lic_editor POST_BUILD
             COMMAND "${CMAKE_COMMAND}" -E copy_directory
                     "${LIC_SHADER_OUTPUT_DIR}" "$<TARGET_FILE_DIR:lic_editor>/shaders"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:lic_editor>/assets/materials"
+            COMMAND "${CMAKE_COMMAND}" -E copy_directory
+                    "${CMAKE_CURRENT_SOURCE_DIR}/assets/materials" "$<TARGET_FILE_DIR:lic_editor>/assets/materials"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:lic_editor>/assets/scripts"
+            COMMAND "${CMAKE_COMMAND}" -E copy_directory
+                    "${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts" "$<TARGET_FILE_DIR:lic_editor>/assets/scripts"
             VERBATIM
-            COMMENT "Copy LIC viewport shaders beside the executable"
+            COMMENT "Copy LIC shaders, NEXUS scripts and material presets beside the executable"
         )
         message(STATUS "LIC Engine Vulkan viewport: enabled (GLFW + Vulkan + glslc)")
     else()

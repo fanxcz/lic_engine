@@ -1,35 +1,31 @@
-# NEXUS scripting in LIC Engine
+# NEXUS gameplay scripts in LIC Engine
 
-LIC Engine bundles the NEXUS 1.1.0 compiler from [fanxcz/nexus-lang](https://github.com/fanxcz/nexus-lang). The scene editor opens **NEXUS Rules** from the top toolbar and creates the project script at:
+LIC Engine bundles the NEXUS 1.1.0 compiler from [fanxcz/nexus-lang](https://github.com/fanxcz/nexus-lang). The editor's **NEXUS Rules** panel opens the project copy at:
 
 `%LOCALAPPDATA%/LIC Engine/Projects/Default/Scripts/GameRules.nx` on Windows (the equivalent user-data project directory on Linux/macOS).
 
-The compiler is a real NEXUS program compiler—not a NEXUS-like parser written in the engine. The panel provides **Save**, **Check**, **Build**, and **Test Rules**. VOIDBOUND compiles and runs this script at the start of each new run. If the compiler or script fails, the game logs the diagnostic and keeps safe built-in defaults.
+The bundled source of truth is `assets/scripts/GameRules.nx`. It declares the game-balance functions in NEXUS and prints typed `LICCFG_*=value` rows. On each new run, LIC Engine checks/builds the script with the NEXUS native backend, runs it, parses the output and clamps the values to safe ranges before starting the simulation. The panel supports **Save**, **Check**, **Build**, **Test Rules** and **Reload**. On failure the editor shows the compiler diagnostic and falls back to the built-in defaults.
 
-## Game-rule output API
+## Script-controlled balance
 
-A rules script uses the ordinary NEXUS `print()` function. The engine reads the following output keys and clamps them to safe ranges:
+The script controls player health and speed, pulse interval, dash cooldown, wave population and cap, enemy base health and wave scaling, elite enemy cadence and bonus health, scoring, level thresholds, XP pickup lifetime, spawn interval scaling, rapid-fire upgrade, heavy-round damage, vitality upgrade and mobility upgrade.
 
-| Output line | Meaning | Accepted range |
-|---|---|---:|
-| `LICCFG_PLAYER_HEALTH=100` | Starting and maximum health | 25–500 |
-| `LICCFG_PLAYER_SPEED=230` | Player move speed, value divided by 100 | 80–600 |
-| `LICCFG_ENEMY_SPEED=68` | Base enemy speed, value divided by 100 | 20–250 |
-| `LICCFG_FIRE_INTERVAL_MS=240` | Time between pulses | 80–2000 ms |
-| `LICCFG_DASH_COOLDOWN_MS=1350` | Dash cooldown | 250–5000 ms |
-
-Minimal example:
+A minimal function:
 
 ```nx
+fn player_health() -> i64 {
+    return 125
+}
+
 fn main() {
-    print("LICCFG_PLAYER_HEALTH=125")
-    print("LICCFG_PLAYER_SPEED=270")
-    print("LICCFG_ENEMY_SPEED=72")
-    print("LICCFG_FIRE_INTERVAL_MS=190")
-    print("LICCFG_DASH_COOLDOWN_MS=1100")
+    print("LICCFG_PLAYER_HEALTH=" + str_i64(player_health()))
 }
 ```
 
-Save the script and click **Test Rules** to compile and preview its output. Press **Play Game** and choose **START RUN** to apply it to the actual game simulation. Values absent from the output retain the defaults. The NEXUS native backend currently supports a subset of the full language; use the NEXUS diagnostics shown in the panel if a construct is unsupported.
+Edit the functions in `GameRules.nx`, save, then click **Test Rules**. Start a new run with **START RUN** to apply the updated values to actual gameplay.
 
-The packaged NEXUS executable looks for `runtime/runtime.cpp` beside the compiler. Keep the complete LIC Engine archive extracted; copying `nexus.exe` alone will not include its required runtime source or standard library.
+NEXUS currently acts as the game's balance/rules layer. Vulkan commands, the platform event loop, resource lifetime, and ECS storage remain native C++ because the current NEXUS compiler/runtime does not yet expose an in-process LIC Engine host API for per-frame script callbacks. The next integration milestone is an engine API that lets NEXUS scripts drive entity creation, transforms, input and gameplay callbacks directly.
+
+## Compiler files in the shipped archive
+
+Keep the full archive extracted. The compiler uses `runtime/runtime.cpp` to build NEXUS programs, with the `stdlib/` directory and compiler license alongside it. The editor also copies the bundled `assets/scripts/GameRules.nx` into the writable project on first launch, so personal edits are not overwritten by updates.

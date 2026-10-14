@@ -80,3 +80,10 @@ Errors should identify the operation and relevant asset/resource path, and sugge
 ## Platform strategy
 
 Prove the complete path on Windows and Linux desktop first. Keep path, input, window, and graphics interfaces portable. Android later requires lifecycle handling, touch input, packaging, and mobile GPU validation; compiling the core alone does not mean Android is supported. Web export needs a separately planned graphics and packaging strategy.
+
+
+## NEXUS and engine asset contracts
+
+The NEXUS compiler and its standard library are shipped beside the graphical editor. `assets/scripts/GameRules.nx` is the checked-in source of gameplay balance; the editor copies it into the user's writable project without overwriting edits. The engine validates the script's printed configuration values before applying them to the simulation. NEXUS does not yet run in-process as a per-frame gameplay VM, so Vulkan, the OS/event loop and ECS storage are native modules; the intended next step is a supported host API for NEXUS entity/input/update callbacks.
+
+Material resources are versioned `.licmat` text assets, independent of Vulkan handles. Each scene object's appearance stores linear base RGBA, metallic, roughness and emission strength. Scene format v2 serializes these properties, while the loader remains compatible with v1 scenes using default surface parameters. Presets are copied into a project only when a preset file is absent, so user-authored materials survive editor updates.
