@@ -67,6 +67,7 @@ private:
     ViewportRect viewport_rect_{};
     std::vector<std::string> console_messages_;
     std::array<char, 32768> nexus_script_buffer_{};
+    std::array<lic::world::MaterialResource, 5> game_materials_{};
     std::string nexus_output_;
     std::string nexus_status_{"NEXUS rules not loaded"};
     GLFWwindow* window_{};
@@ -106,6 +107,9 @@ private:
     void save_nexus_script();
     void execute_nexus_action(int action);
     void apply_nexus_game_rules();
+    void load_project_materials();
+    void seed_material_library();
+    void apply_project_materials();
     void start_game_run();
     void draw_nexus_panel();
     void enter_game_mode(bool standalone = false);
