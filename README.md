@@ -64,6 +64,20 @@ Standalone Game Runner ───┘        │
 
 These are initial choices, not reasons to couple every module permanently to one vendor. Third-party licenses must be reviewed and recorded before dependencies are added.
 
+## Platform binaries
+
+The repository now includes a build workflow for downloadable native executables:
+
+| Package | Current contents |
+|---|---|
+| Windows x64 | Native executable with the Vulkan viewport and compiled shaders |
+| Linux x64 | Native executable with the Vulkan viewport and compiled shaders |
+| macOS arm64 | Core command-line executable; desktop Vulkan portability is not yet validated |
+
+On Windows 11, run `tools/build-windows.ps1` to build and package the local executable. To dispatch native builds on GitHub Actions and download all platform packages, run `tools/build-all-platforms.ps1` from an authenticated GitHub CLI session. Full steps are in [docs/BUILDING.md](docs/BUILDING.md).
+
+The generated packages are attached automatically when a version tag beginning with `v` is pushed. Android APK and Web/WASM builds are not claimed yet: those targets need platform entry points and renderer integration first.
+
 ## Roadmap
 
 1. **Foundation:** repository conventions, CMake targets, logging, assertions, configuration, platform/window layer, and CI build checks.
