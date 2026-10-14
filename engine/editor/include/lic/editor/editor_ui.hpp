@@ -1,5 +1,6 @@
 #pragma once
 
+#include <lic/game/voidbound.hpp>
 #include <lic/world/scene.hpp>
 #include <vulkan/vulkan.h>
 
@@ -21,7 +22,7 @@ struct ViewportRect final {
 
 class EditorUi final {
 public:
-    EditorUi();
+    explicit EditorUi(bool start_in_game = false);
     ~EditorUi();
 
     EditorUi(const EditorUi&) = delete;
@@ -39,18 +40,23 @@ public:
 
     [[nodiscard]] lic::world::World& world() noexcept { return world_; }
     [[nodiscard]] const lic::world::World& world() const noexcept { return world_; }
+    [[nodiscard]] lic::world::World& render_world() noexcept { return game_mode_ ? game_.world() : world_; }
+    [[nodiscard]] const lic::world::World& render_world() const noexcept { return game_mode_ ? game_.world() : world_; }
     [[nodiscard]] lic::world::Entity selected_entity() const noexcept { return selected_entity_; }
     [[nodiscard]] ViewportRect viewport_rect() const noexcept { return viewport_rect_; }
-    [[nodiscard]] float camera_yaw() const noexcept { return camera_yaw_; }
-    [[nodiscard]] float camera_pitch() const noexcept { return camera_pitch_; }
-    [[nodiscard]] float camera_zoom() const noexcept { return camera_zoom_; }
+    [[nodiscard]] float camera_yaw() const noexcept;
+    [[nodiscard]] float camera_pitch() const noexcept;
+    [[nodiscard]] float camera_zoom() const noexcept;
     [[nodiscard]] float play_rotation_degrees() const noexcept { return play_rotation_degrees_; }
     [[nodiscard]] bool playing() const noexcept { return playing_; }
+    [[nodiscard]] bool game_mode() const noexcept { return game_mode_; }
+    [[nodiscard]] bool standalone_game() const noexcept { return standalone_game_; }
 
 private:
     std::filesystem::path project_root_;
     std::filesystem::path scene_path_;
     lic::world::World world_;
+    lic::game::Voidbound game_;
     lic::world::Entity selected_entity_{};
     ViewportRect viewport_rect_{};
     std::vector<std::string> console_messages_;
@@ -62,6 +68,10 @@ private:
     bool playing_{};
     bool show_grid_{true};
     bool unsaved_new_scene_requested_{};
+    bool game_mode_{};
+    bool standalone_game_{};
+    bool game_escape_was_down_{};
+    bool game_dash_was_down_{};
     float camera_yaw_{0.68F};
     float camera_pitch_{0.38F};
     float camera_zoom_{1.0F};
@@ -81,6 +91,9 @@ private:
     void duplicate_selected();
     void delete_selected();
     void toggle_play();
+    void enter_game_mode(bool standalone = false);
+    void exit_game_mode();
+    void draw_game_ui();
     void draw_scene_canvas();
     void draw_toolbar();
     void draw_hierarchy();

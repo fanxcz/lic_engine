@@ -41,6 +41,7 @@ class Voidbound final {
 public:
     Voidbound();
 
+    void show_menu();
     void start_run();
     void update(float delta_seconds, const Input& input);
     void pause();

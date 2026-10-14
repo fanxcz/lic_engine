@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
@@ -38,6 +39,14 @@ lic::world::Entity Voidbound::spawn_actor(std::string name, ActorKind actor_kind
     stats.kind = actor_kind;
     world_.emplace<GameActor>(entity, stats);
     return entity;
+}
+
+void Voidbound::show_menu() {
+    world_ = lic::world::World{};
+    player_ = {};
+    state_ = RunState::Menu;
+    pending_upgrades_ = 0;
+    pending_wave_advance_ = false;
 }
 
 void Voidbound::start_run() {

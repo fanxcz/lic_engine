@@ -4,6 +4,9 @@
 #include <backends/imgui_impl_vulkan.h>
 #include <imgui.h>
 
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -59,9 +62,46 @@ const char* node_icon(lic::world::NodeKind kind) {
 
 } // namespace
 
-EditorUi::EditorUi()
-    : project_root_(default_project_root()), scene_path_(project_root_ / "Scenes" / "Main.licscene") {
+EditorUi::EditorUi(bool start_in_game)
+    : project_root_(default_project_root()), scene_path_(project_root_ / "Scenes" / "Main.licscene"),
+      game_mode_(start_in_game), standalone_game_(start_in_game) {
     create_default_scene();
+}
+
+float EditorUi::camera_yaw() const noexcept {
+    return game_mode_ ? 0.0F : camera_yaw_;
+}
+
+float EditorUi::camera_pitch() const noexcept {
+    return game_mode_ ? 0.88F : camera_pitch_;
+}
+
+float EditorUi::camera_zoom() const noexcept {
+    return game_mode_ ? 0.23F : camera_zoom_;
+}
+
+void EditorUi::enter_game_mode(bool standalone) {
+    playing_ = false;
+    game_ = lic::game::Voidbound{};
+    game_mode_ = true;
+    standalone_game_ = standalone;
+    game_escape_was_down_ = false;
+    game_dash_was_down_ = false;
+    status_message_ = "Voidbound";
+    log("Entered Voidbound game mode");
+}
+
+void EditorUi::exit_game_mode() {
+    game_mode_ = false;
+    standalone_game_ = false;
+    playing_ = false;
+    game_escape_was_down_ = false;
+    game_dash_was_down_ = false;
+    camera_yaw_ = 0.68F;
+    camera_pitch_ = 0.38F;
+    camera_zoom_ = 1.0F;
+    status_message_ = "Returned to editor";
+    log("Returned to scene editor");
 }
 
 EditorUi::~EditorUi() {
@@ -359,6 +399,41 @@ void EditorUi::build_frame(float delta_seconds) {
     ImGui::NewFrame();
 
     const ImVec2 display = ImGui::GetIO().DisplaySize;
+    if (game_mode_) {
+        viewport_rect_ = {0.0F, 0.0F, std::max(1.0F, display.x), std::max(1.0F, display.y)};
+        const bool escapeDown = glfwGetKey(window_, GLFW_KEY_ESCAPE) == GLFW_PRESS;
+        const bool escapePressed = escapeDown && !game_escape_was_down_;
+        game_escape_was_down_ = escapeDown;
+        const bool dashDown = glfwGetKey(window_, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
+                              glfwGetKey(window_, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
+        const bool dashPressed = dashDown && !game_dash_was_down_;
+        game_dash_was_down_ = dashDown;
+
+        if (escapePressed) {
+            if (game_.state() == lic::game::RunState::Playing) game_.pause();
+            else if (game_.state() == lic::game::RunState::Paused) game_.resume();
+            else if (!standalone_game_) exit_game_mode();
+            else if (game_.state() != lic::game::RunState::Upgrade) game_.show_menu();
+        }
+
+        if (game_mode_ && game_.state() == lic::game::RunState::Playing) {
+            lic::game::Input input;
+            input.move_x = static_cast<float>(glfwGetKey(window_, GLFW_KEY_D) == GLFW_PRESS) -
+                           static_cast<float>(glfwGetKey(window_, GLFW_KEY_A) == GLFW_PRESS);
+            input.move_z = static_cast<float>(glfwGetKey(window_, GLFW_KEY_S) == GLFW_PRESS) -
+                           static_cast<float>(glfwGetKey(window_, GLFW_KEY_W) == GLFW_PRESS);
+            input.dash_pressed = dashPressed;
+            input.fire_held = glfwGetMouseButton(window_, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS ||
+                              glfwGetKey(window_, GLFW_KEY_SPACE) == GLFW_PRESS;
+            game_.update(delta_seconds_, input);
+        }
+
+        draw_scene_canvas();
+        if (game_mode_) draw_game_ui();
+        ImGui::Render();
+        return;
+    }
+
     viewport_rect_.x = kLeftPanelWidth;
     viewport_rect_.y = kToolbarHeight;
     viewport_rect_.width = std::max(1.0F, display.x - kLeftPanelWidth - kRightPanelWidth);
@@ -370,6 +445,7 @@ void EditorUi::build_frame(float delta_seconds) {
     if (!io.WantTextInput && ImGui::IsKeyPressed(ImGuiKey_F6)) {
         if (playing_) toggle_play();
     }
+    if (!io.WantTextInput && ImGui::IsKeyPressed(ImGuiKey_F7)) enter_game_mode(false);
 
     draw_scene_canvas();
     draw_toolbar();
@@ -418,6 +494,8 @@ void EditorUi::draw_toolbar() {
         if (ImGui::Button("Play  F5")) toggle_play();
         ImGui::PopStyleColor();
     }
+    ImGui::SameLine();
+    if (ImGui::Button("Play Game  F7")) enter_game_mode(false);
     ImGui::SameLine();
     if (ImGui::Button("Reset Camera")) {
         camera_yaw_ = 0.68F;
@@ -648,13 +726,15 @@ void EditorUi::draw_scene_canvas() {
         draw->AddLine(ImVec2(topLeft.x + viewport_rect_.width * 0.5F, topLeft.y),
                       ImVec2(topLeft.x + viewport_rect_.width * 0.5F, bottomRight.y), zAxisColor, 1.0F);
     }
-    draw->AddText(ImVec2(topLeft.x + 10.0F, topLeft.y + 7.0F), IM_COL32(160, 170, 181, 200), "3D VIEW");
-    const char* hint = "MMB ORBIT   WHEEL ZOOM";
-    const ImVec2 hintSize = ImGui::CalcTextSize(hint);
-    draw->AddText(ImVec2(bottomRight.x - hintSize.x - 10.0F, topLeft.y + 7.0F),
-                  IM_COL32(126, 136, 148, 180), hint);
+    if (!game_mode_) {
+        draw->AddText(ImVec2(topLeft.x + 10.0F, topLeft.y + 7.0F), IM_COL32(160, 170, 181, 200), "3D VIEW");
+        const char* hint = "MMB ORBIT   WHEEL ZOOM";
+        const ImVec2 hintSize = ImGui::CalcTextSize(hint);
+        draw->AddText(ImVec2(bottomRight.x - hintSize.x - 10.0F, topLeft.y + 7.0F),
+                      IM_COL32(126, 136, 148, 180), hint);
+    }
 
-    if (ImGui::IsWindowHovered()) {
+    if (!game_mode_ && ImGui::IsWindowHovered()) {
         ImGuiIO& io = ImGui::GetIO();
         if (ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {
             camera_yaw_ -= io.MouseDelta.x * 0.006F;
@@ -662,6 +742,130 @@ void EditorUi::draw_scene_canvas() {
         }
         if (io.MouseWheel != 0.0F) {
             camera_zoom_ = std::clamp(camera_zoom_ * (1.0F + io.MouseWheel * 0.08F), 0.3F, 3.5F);
+        }
+    }
+    ImGui::End();
+}
+
+void EditorUi::draw_game_ui() {
+    const ImVec2 display = ImGui::GetIO().DisplaySize;
+    ImGui::SetNextWindowPos(ImVec2(0.0F, 0.0F), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(display, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.0F);
+    const auto flags = kFixedPanelFlags | ImGuiWindowFlags_NoBackground |
+                       ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBringToFrontOnFocus;
+    if (!ImGui::Begin("##VoidboundOverlay", nullptr, flags)) {
+        ImGui::End();
+        return;
+    }
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    const auto state = game_.state();
+    const ImU32 white = IM_COL32(233, 242, 250, 255);
+    const ImU32 muted = IM_COL32(158, 177, 194, 255);
+    const ImU32 cyan = IM_COL32(78, 220, 230, 255);
+
+    if (state == lic::game::RunState::Playing || state == lic::game::RunState::Paused ||
+        state == lic::game::RunState::Upgrade) {
+        draw->AddText(ImVec2(26.0F, 20.0F), cyan, "VOIDBOUND");
+        draw->AddText(ImVec2(26.0F, 42.0F), muted, "RIFT SURVIVAL // RUN PROTOCOL");
+        draw->AddText(ImVec2(26.0F, 70.0F), white, ("WAVE  " + std::to_string(game_.wave())).c_str());
+        draw->AddText(ImVec2(150.0F, 70.0F), muted, ("KILLS  " + std::to_string(game_.kills())).c_str());
+        draw->AddText(ImVec2(280.0F, 70.0F), muted, ("SCORE  " + std::to_string(game_.score())).c_str());
+
+        const ImVec2 barPosition(26.0F, 94.0F);
+        const float barWidth = std::min(280.0F, std::max(120.0F, display.x * 0.22F));
+        draw->AddRectFilled(barPosition, ImVec2(barPosition.x + barWidth, barPosition.y + 12.0F),
+                            IM_COL32(36, 48, 61, 230), 3.0F);
+        const float healthRatio = game_.max_health() > 0.0F
+            ? std::clamp(game_.health() / game_.max_health(), 0.0F, 1.0F) : 0.0F;
+        draw->AddRectFilled(barPosition, ImVec2(barPosition.x + barWidth * healthRatio, barPosition.y + 12.0F),
+                            healthRatio > 0.30F ? IM_COL32(70, 208, 166, 255) : IM_COL32(238, 83, 92, 255), 3.0F);
+        draw->AddText(ImVec2(26.0F, 111.0F), muted,
+                      ("HP  " + std::to_string(static_cast<int>(game_.health())) + " / " +
+                       std::to_string(static_cast<int>(game_.max_health()))).c_str());
+        draw->AddText(ImVec2(26.0F, display.y - 42.0F), muted,
+                      "WASD MOVE    SHIFT DASH    MOUSE 1 / SPACE FIRE    ESC PAUSE");
+        draw->AddText(ImVec2(display.x - 185.0F, 25.0F), muted,
+                      ("LVL " + std::to_string(game_.level()) + "   XP " +
+                       std::to_string(game_.experience()) + "/" +
+                       std::to_string(game_.experience_to_next())).c_str());
+    }
+
+    if (state == lic::game::RunState::Playing) {
+        ImGui::SetCursorScreenPos(ImVec2(display.x - 122.0F, 52.0F));
+        if (ImGui::Button("PAUSE  [ESC]", ImVec2(96.0F, 28.0F))) game_.pause();
+    } else {
+        const int tintAlpha = state == lic::game::RunState::Menu ? 216 : 170;
+        draw->AddRectFilled(ImVec2(0.0F, 0.0F), display, IM_COL32(5, 9, 15, tintAlpha));
+        const float panelWidth = std::min(490.0F, display.x - 32.0F);
+        const float panelHeight = state == lic::game::RunState::Upgrade ? 342.0F : 365.0F;
+        const ImVec2 panelMin((display.x - panelWidth) * 0.5F, (display.y - panelHeight) * 0.5F);
+        const ImVec2 panelMax(panelMin.x + panelWidth, panelMin.y + panelHeight);
+        draw->AddRectFilled(panelMin, panelMax, IM_COL32(17, 25, 35, 248), 8.0F);
+        draw->AddRect(panelMin, panelMax, IM_COL32(64, 104, 128, 220), 8.0F, 0, 1.0F);
+        ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 25.0F));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.31F, 0.88F, 0.94F, 1.0F));
+        ImGui::TextUnformatted("LIC / FIELD OPERATIONS");
+        ImGui::PopStyleColor();
+        ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 30.0F, panelMin.y + 51.0F));
+        if (state == lic::game::RunState::Menu) {
+            ImGui::TextUnformatted("VOIDBOUND");
+            ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 83.0F));
+            ImGui::TextWrapped("The rift is spreading. Survive the waves, collect memory shards and build a stronger loadout.");
+            ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 145.0F));
+            if (ImGui::Button("START RUN", ImVec2(panelWidth - 64.0F, 38.0F))) game_.start_run();
+            ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 200.0F));
+            ImGui::TextDisabled("WASD  move     SHIFT  dash");
+            ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 222.0F));
+            ImGui::TextDisabled("MOUSE 1 or SPACE  fire     ESC  back / pause");
+            ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 282.0F));
+            if (!standalone_game_ && ImGui::Button("BACK TO EDITOR", ImVec2(panelWidth - 64.0F, 32.0F))) {
+                exit_game_mode();
+            }
+            if (standalone_game_) {
+                ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 282.0F));
+                if (ImGui::Button("QUIT", ImVec2(panelWidth - 64.0F, 32.0F))) {
+                    glfwSetWindowShouldClose(window_, GLFW_TRUE);
+                }
+            }
+        } else if (state == lic::game::RunState::Upgrade) {
+            ImGui::TextUnformatted("CHOOSE AN UPGRADE");
+            ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 90.0F));
+            ImGui::TextWrapped("The rift is quiet for a moment. Choose one module before the next assault.");
+            for (std::size_t i = 0; i < game_.upgrade_options().size(); ++i) {
+                const auto& option = game_.upgrade_options()[i];
+                ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 145.0F + static_cast<float>(i) * 58.0F));
+                const std::string label = std::string(option.name) + "  —  " + std::string(option.description);
+                if (ImGui::Button(label.c_str(), ImVec2(panelWidth - 64.0F, 43.0F))) game_.choose_upgrade(i);
+            }
+        } else if (state == lic::game::RunState::Paused) {
+            ImGui::TextUnformatted("PAUSED");
+            ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 104.0F));
+            if (ImGui::Button("RESUME", ImVec2(panelWidth - 64.0F, 36.0F))) game_.resume();
+            ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 154.0F));
+            if (ImGui::Button("RESTART RUN", ImVec2(panelWidth - 64.0F, 36.0F))) game_.start_run();
+            ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 204.0F));
+            if (!standalone_game_ && ImGui::Button("BACK TO EDITOR", ImVec2(panelWidth - 64.0F, 36.0F))) exit_game_mode();
+            if (standalone_game_) {
+                ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 204.0F));
+                if (ImGui::Button("QUIT TO DESKTOP", ImVec2(panelWidth - 64.0F, 36.0F))) glfwSetWindowShouldClose(window_, GLFW_TRUE);
+            }
+        } else if (state == lic::game::RunState::GameOver) {
+            ImGui::TextUnformatted("SIGNAL LOST");
+            ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 95.0F));
+            ImGui::TextWrapped(("Wave " + std::to_string(game_.wave()) + "   |   Score " +
+                                std::to_string(game_.score()) + "   |   Kills " +
+                                std::to_string(game_.kills())).c_str());
+            ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 145.0F));
+            if (ImGui::Button("TRY AGAIN", ImVec2(panelWidth - 64.0F, 36.0F))) game_.start_run();
+            ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 195.0F));
+            if (ImGui::Button("MAIN MENU", ImVec2(panelWidth - 64.0F, 36.0F))) game_.show_menu();
+            ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 245.0F));
+            if (!standalone_game_ && ImGui::Button("BACK TO EDITOR", ImVec2(panelWidth - 64.0F, 32.0F))) exit_game_mode();
+            if (standalone_game_) {
+                ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 245.0F));
+                if (ImGui::Button("QUIT TO DESKTOP", ImVec2(panelWidth - 64.0F, 32.0F))) glfwSetWindowShouldClose(window_, GLFW_TRUE);
+            }
         }
     }
     ImGui::End();
