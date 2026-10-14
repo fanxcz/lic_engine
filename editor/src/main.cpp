@@ -5,6 +5,7 @@
 #include <lic/renderer/vulkan_viewport.hpp>
 #endif
 
+#include <filesystem>
 #include <iostream>
 #include <string_view>
 
@@ -24,7 +25,7 @@ int main(int argc, char** argv) {
         }
         if (argument == "--window") {
 #ifdef LIC_HAS_VULKAN_VIEWPORT
-            return lic::renderer::run_vulkan_viewport();
+            return lic::renderer::run_vulkan_viewport(std::filesystem::absolute(std::filesystem::path(argv[0])));
 #else
             std::cerr << "This build has no Vulkan viewport. Install Vulkan development files, GLFW 3, and glslc, "
                          "then reconfigure with LIC_ENGINE_ENABLE_VULKAN=ON.\n";
@@ -37,6 +38,11 @@ int main(int argc, char** argv) {
         }
     }
 
+#ifdef LIC_HAS_VULKAN_VIEWPORT
+    // Launch the graphical viewport when the executable is opened without CLI arguments.
+    return lic::renderer::run_vulkan_viewport(std::filesystem::absolute(std::filesystem::path(argv[0])));
+#else
     lic::core::print_build_information(std::cout);
     return 0;
+#endif
 }
