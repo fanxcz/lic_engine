@@ -7,6 +7,7 @@ layout(push_constant) uniform SceneObjectPushConstants {
     vec4 rotation;
     vec4 scale;
     vec4 color;
+    vec4 material;
     vec4 camera;
 } objectData;
 
@@ -53,5 +54,14 @@ void main() {
         vec3(0.62, 0.76, 0.94), vec3(0.95, 1.00, 1.00),
         vec3(0.48, 0.61, 0.79), vec3(0.86, 0.94, 1.00)
     );
-    outColor = faceShade[gl_VertexIndex / 6] * objectData.color.rgb;
+    vec3 face = faceShade[gl_VertexIndex / 6];
+    float metallic = clamp(objectData.material.x, 0.0, 1.0);
+    float roughness = clamp(objectData.material.y, 0.04, 1.0);
+    float emission = clamp(objectData.material.z, 0.0, 4.0);
+    float diffuse = dot(face, vec3(0.3333333));
+    float specular = pow(clamp(diffuse, 0.0, 1.0), mix(32.0, 3.0, roughness)) * metallic * 0.32;
+    vec3 lit = objectData.color.rgb * face * (1.0 - metallic * 0.22);
+    lit += vec3(specular);
+    lit += objectData.color.rgb * emission;
+    outColor = clamp(lit, 0.0, 1.0);
 }

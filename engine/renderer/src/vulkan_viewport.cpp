@@ -66,9 +66,10 @@ struct alignas(16) SceneObjectPushConstants final {
     float rotation[4]{};
     float scale[4]{};
     float color[4]{};
+    float material[4]{}; // metallic, roughness, emission strength, reserved
     float camera[4]{};
 };
-static_assert(sizeof(SceneObjectPushConstants) == 80);
+static_assert(sizeof(SceneObjectPushConstants) == 96);
 
 class VulkanViewport final {
 public:
@@ -780,6 +781,9 @@ private:
             push.color[1] = appearance.color[1];
             push.color[2] = appearance.color[2];
             push.color[3] = appearance.color[3];
+            push.material[0] = appearance.metallic;
+            push.material[1] = appearance.roughness;
+            push.material[2] = appearance.emission_strength;
             push.camera[0] = editor_ui_.camera_yaw();
             push.camera[1] = editor_ui_.camera_pitch();
             push.camera[2] = editor_ui_.camera_zoom();

@@ -127,6 +127,9 @@ void test_scene_serialization() {
     transform.scale = {0.5F, 0.75F, 1.25F};
     lic::world::Appearance appearance;
     appearance.color = {0.2F, 0.4F, 0.8F, 1.0F};
+    appearance.metallic = 0.72F;
+    appearance.roughness = 0.24F;
+    appearance.emission_strength = 0.35F;
     const auto cube = lic::world::create_node(source, lic::world::NodeKind::MeshInstance3D,
                                                "Cube with spaces", transform, appearance);
     source.get<lic::world::NodeEnabled>(cube).value = false;
@@ -148,6 +151,10 @@ void test_scene_serialization() {
         expect(restored.rotation_degrees[2] == -30.0F, "scene round trip should preserve rotations");
         expect(restored.scale[1] == 0.75F, "scene round trip should preserve scales");
         expect(restoredAppearance.color[2] == 0.8F, "scene round trip should preserve material color");
+        expect(restoredAppearance.metallic == 0.72F, "scene round trip should preserve metallic");
+        expect(restoredAppearance.roughness == 0.24F, "scene round trip should preserve roughness");
+        expect(restoredAppearance.emission_strength == 0.35F,
+               "scene round trip should preserve emission strength");
         expect(!loaded.get<lic::world::NodeEnabled>(entity).value, "scene round trip should preserve enabled state");
     });
     expect(foundCube, "scene round trip should preserve names with spaces");
@@ -166,6 +173,45 @@ void test_scene_serialization() {
     expect(invalidFileRejected, "malformed scene files should be rejected");
     expect(loaded.entity_count() == entityCountBeforeBrokenLoad,
            "a failed load must leave the current scene unchanged");
+    std::filesystem::remove_all(folder, ignored);
+}
+
+void test_material_resources() {
+    const auto folder = std::filesystem::temp_directory_path() / "lic-engine-material-tests";
+    const auto path = folder / "Test Material.licmat";
+    const auto brokenPath = folder / "broken.licmat";
+    std::error_code ignored;
+    std::filesystem::remove_all(folder, ignored);
+
+    lic::world::MaterialResource expected;
+    expected.name = "Rift alloy";
+    expected.surface.color = {0.12F, 0.72F, 0.91F, 1.0F};
+    expected.surface.metallic = 0.8F;
+    expected.surface.roughness = 0.21F;
+    expected.surface.emission_strength = 0.6F;
+    lic::world::save_material(expected, path);
+    const auto loaded = lic::world::load_material(path);
+    expect(loaded.name == expected.name, ".licmat round trip should preserve the material name");
+    expect(loaded.surface.color[1] == expected.surface.color[1],
+           ".licmat round trip should preserve base color");
+    expect(loaded.surface.metallic == expected.surface.metallic,
+           ".licmat round trip should preserve metallic");
+    expect(loaded.surface.roughness == expected.surface.roughness,
+           ".licmat round trip should preserve roughness");
+    expect(loaded.surface.emission_strength == expected.surface.emission_strength,
+           ".licmat round trip should preserve emission");
+
+    {
+        std::ofstream bad(brokenPath, std::ios::binary | std::ios::trunc);
+        bad << "LICMAT 1\nname \"Broken\"\nbase_color 1 1 1 1\nmetallic 8\nroughness .5\nemission 0\n";
+    }
+    bool invalidRejected = false;
+    try {
+        (void)lic::world::load_material(brokenPath);
+    } catch (const std::runtime_error&) {
+        invalidRejected = true;
+    }
+    expect(invalidRejected, "invalid material property ranges must be rejected");
     std::filesystem::remove_all(folder, ignored);
 }
 
@@ -202,7 +248,8 @@ int main() {
     test_version();
     test_world_entity_lifecycle();
     test_scene_serialization();
+    test_material_resources();
     test_voidbound_gameplay();
-    std::cout << "LIC Engine core, world, scene and gameplay tests passed.\n";
+    std::cout << "LIC Engine core, world, scene, materials and gameplay tests passed.\n";
     return EXIT_SUCCESS;
 }

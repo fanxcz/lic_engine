@@ -40,8 +40,97 @@ struct NodeKindComponent final {
 };
 
 struct Appearance final {
+    // Linear RGBA base color. LIC Engine uses a right-handed, Y-up 3D world.
     std::array<float, 4> color{0.30F, 0.67F, 0.90F, 1.0F};
+    float metallic{0.0F};
+    float roughness{0.68F};
+    float emission_strength{0.0F};
 };
+
+struct MaterialResource final {
+    std::string name{"Default"};
+    Appearance surface{};
+};
+
+// .licmat is a small, versioned text asset; it is independent of GPU handles
+// and can therefore be checked, diffed and shared between projects.
+inline void save_material(const MaterialResource& material, const std::filesystem::path& path) {
+    if (path.empty() || material.name.empty() || material.name.size() > 256) {
+        throw std::invalid_argument("Material requires a path and a name (1..256 characters)");
+    }
+    const auto& a = material.surface;
+    for (float value : a.color) {
+        if (!std::isfinite(value) || value < 0.0F || value > 1.0F)
+            throw std::invalid_argument("Material base color channels must be in [0, 1]");
+    }
+    if (!std::isfinite(a.metallic) || a.metallic < 0.0F || a.metallic > 1.0F ||
+        !std::isfinite(a.roughness) || a.roughness < 0.04F || a.roughness > 1.0F ||
+        !std::isfinite(a.emission_strength) || a.emission_strength < 0.0F || a.emission_strength > 4.0F) {
+        throw std::invalid_argument("Material metallic, roughness or emission is outside its supported range");
+    }
+    if (!path.parent_path().empty()) std::filesystem::create_directories(path.parent_path());
+    const auto temporary = path.string() + ".tmp";
+    std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
+    if (!output) throw std::runtime_error("Cannot write material file: " + temporary);
+    output << "LICMAT 1\nname " << std::quoted(material.name) << '\n'
+           << std::setprecision(9)
+           << "base_color " << a.color[0] << ' ' << a.color[1] << ' ' << a.color[2] << ' ' << a.color[3] << '\n'
+           << "metallic " << a.metallic << '\n'
+           << "roughness " << a.roughness << '\n'
+           << "emission " << a.emission_strength << '\n';
+    output.flush();
+    if (!output) {
+        output.close();
+        std::error_code ignored;
+        std::filesystem::remove(temporary, ignored);
+        throw std::runtime_error("Failed while writing material file: " + temporary);
+    }
+    output.close();
+    std::error_code error;
+    std::filesystem::rename(temporary, path, error);
+    if (error) {
+        std::error_code ignored;
+        std::filesystem::remove(path, ignored);
+        error.clear();
+        std::filesystem::rename(temporary, path, error);
+        if (error) {
+            std::filesystem::remove(temporary, ignored);
+            throw std::runtime_error("Cannot finish saving material file: " + path.string());
+        }
+    }
+}
+
+[[nodiscard]] inline MaterialResource load_material(const std::filesystem::path& path) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input) throw std::runtime_error("Cannot open material file: " + path.string());
+    std::string magic, label;
+    unsigned version = 0;
+    MaterialResource material;
+    if (!(input >> magic >> version) || magic != "LICMAT" || version != 1 ||
+        !(input >> label >> std::quoted(material.name)) || label != "name" ||
+        material.name.empty() || material.name.size() > 256) {
+        throw std::runtime_error("Invalid or unsupported LIC material header: " + path.string());
+    }
+    auto& a = material.surface;
+    if (!(input >> label) || label != "base_color")
+        throw std::runtime_error("Material is missing base_color: " + path.string());
+    for (float& value : a.color) {
+        if (!(input >> value) || !std::isfinite(value) || value < 0.0F || value > 1.0F)
+            throw std::runtime_error("Invalid material base_color: " + path.string());
+    }
+    if (!(input >> label >> a.metallic) || label != "metallic" ||
+        !std::isfinite(a.metallic) || a.metallic < 0.0F || a.metallic > 1.0F)
+        throw std::runtime_error("Invalid material metallic value: " + path.string());
+    if (!(input >> label >> a.roughness) || label != "roughness" ||
+        !std::isfinite(a.roughness) || a.roughness < 0.04F || a.roughness > 1.0F)
+        throw std::runtime_error("Invalid material roughness value: " + path.string());
+    if (!(input >> label >> a.emission_strength) || label != "emission" ||
+        !std::isfinite(a.emission_strength) || a.emission_strength < 0.0F || a.emission_strength > 4.0F)
+        throw std::runtime_error("Invalid material emission value: " + path.string());
+    input >> std::ws;
+    if (!input.eof()) throw std::runtime_error("Unexpected data after LIC material: " + path.string());
+    return material;
+}
 
 struct NodeEnabled final {
     bool value{true};
@@ -98,7 +187,7 @@ inline void save_scene(const World& world, const std::filesystem::path& path) {
             ++count;
         }
     });
-    output << "LICSCENE 1\n" << "nodes " << count << '\n' << std::setprecision(9);
+    output << "LICSCENE 2\n" << "nodes " << count << '\n' << std::setprecision(9);
     world.each<NodeName>([&](Entity entity, const NodeName& name) {
         if (!world.has<Transform>(entity) || !world.has<NodeKindComponent>(entity) ||
             !world.has<Appearance>(entity) || !world.has<NodeEnabled>(entity)) {
@@ -113,6 +202,8 @@ inline void save_scene(const World& world, const std::filesystem::path& path) {
         for (const float value : transform.rotation_degrees) output << ' ' << value;
         for (const float value : transform.scale) output << ' ' << value;
         for (const float value : appearance.color) output << ' ' << value;
+        output << ' ' << appearance.metallic << ' ' << appearance.roughness
+               << ' ' << appearance.emission_strength;
         output << ' ' << (enabled.value ? 1 : 0) << '\n';
     });
     output.flush();
@@ -164,7 +255,8 @@ inline void load_scene(World& destination, const std::filesystem::path& path) {
     unsigned version = 0;
     std::string nodesLabel;
     std::size_t count = 0;
-    if (!(input >> magic >> version) || magic != "LICSCENE" || version != 1 ||
+    if (!(input >> magic >> version) || magic != "LICSCENE" ||
+        (version != 1 && version != 2) ||
         !(input >> nodesLabel >> count) || nodesLabel != "nodes" || count > 4096) {
         throw std::runtime_error("Invalid or unsupported LIC scene header: " + path.string());
     }
@@ -203,6 +295,16 @@ inline void load_scene(World& destination, const std::filesystem::path& path) {
         for (float& value : record.appearance.color) {
             if (!(input >> value) || !std::isfinite(value) || value < 0.0F || value > 1.0F) {
                 throw std::runtime_error("Invalid node material color");
+            }
+        }
+        if (version >= 2) {
+            auto& material = record.appearance;
+            if (!(input >> material.metallic >> material.roughness >> material.emission_strength) ||
+                !std::isfinite(material.metallic) || material.metallic < 0.0F || material.metallic > 1.0F ||
+                !std::isfinite(material.roughness) || material.roughness < 0.04F || material.roughness > 1.0F ||
+                !std::isfinite(material.emission_strength) || material.emission_strength < 0.0F ||
+                material.emission_strength > 4.0F) {
+                throw std::runtime_error("Invalid node material settings");
             }
         }
         if (!(input >> enabled) || (enabled != 0 && enabled != 1)) {
