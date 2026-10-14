@@ -17,6 +17,12 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Install Linux Vulkan build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvulkan-dev libglfw3-dev mesa-vulkan-drivers
+
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
