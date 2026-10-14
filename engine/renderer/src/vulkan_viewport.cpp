@@ -1,4 +1,6 @@
 #include <lic/renderer/vulkan_viewport.hpp>
+#include <lic/editor/editor_ui.hpp>
+#include <lic/world/scene.hpp>
 
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -15,6 +17,8 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -57,6 +61,15 @@ struct SwapchainSupport {
     std::vector<VkPresentModeKHR> presentModes;
 };
 
+struct alignas(16) SceneObjectPushConstants final {
+    float position[4]{};
+    float rotation[4]{};
+    float scale[4]{};
+    float color[4]{};
+    float camera[4]{};
+};
+static_assert(sizeof(SceneObjectPushConstants) == 80);
+
 class VulkanViewport final {
 public:
     explicit VulkanViewport(const std::filesystem::path& executablePath)
@@ -78,6 +91,7 @@ public:
 
 private:
     std::filesystem::path shaderDirectory_;
+    lic::editor::EditorUi editor_ui_;
 
     void report_startup_error(std::string_view details) const noexcept {
         std::filesystem::path logPath = shaderDirectory_.parent_path() / "lic-engine-startup.log";
@@ -173,6 +187,11 @@ private:
         create_depth_resources();
         create_framebuffers();
         create_command_pool();
+        editor_ui_.initialize_platform(window_);
+        const QueueFamilies families = find_queue_families(physicalDevice_);
+        editor_ui_.initialize_renderer(instance_, physicalDevice_, device_, *families.graphics,
+                                       graphicsQueue_, renderPass_,
+                                       static_cast<std::uint32_t>(swapchainImages_.size()));
         create_command_buffers();
         create_sync_objects();
     }
@@ -617,7 +636,13 @@ private:
             dynamicState.dynamicStateCount = static_cast<std::uint32_t>(dynamicStates.size());
             dynamicState.pDynamicStates = dynamicStates.data();
 
+            VkPushConstantRange pushRange{};
+            pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+            pushRange.offset = 0;
+            pushRange.size = static_cast<std::uint32_t>(sizeof(SceneObjectPushConstants));
             VkPipelineLayoutCreateInfo layoutInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+            layoutInfo.pushConstantRangeCount = 1;
+            layoutInfo.pPushConstantRanges = &pushRange;
             check(vkCreatePipelineLayout(device_, &layoutInfo, nullptr, &pipelineLayout_), "vkCreatePipelineLayout");
 
             VkGraphicsPipelineCreateInfo pipelineInfo{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
@@ -677,36 +702,86 @@ private:
         allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         allocateInfo.commandBufferCount = static_cast<std::uint32_t>(commandBuffers_.size());
         check(vkAllocateCommandBuffers(device_, &allocateInfo, commandBuffers_.data()), "vkAllocateCommandBuffers");
+    }
 
-        for (std::size_t i = 0; i < commandBuffers_.size(); ++i) {
-            VkCommandBufferBeginInfo beginInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
-            beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-            check(vkBeginCommandBuffer(commandBuffers_[i], &beginInfo), "vkBeginCommandBuffer");
+    void record_command_buffer(std::size_t imageIndex) {
+        VkCommandBuffer commandBuffer = commandBuffers_[imageIndex];
+        check(vkResetCommandBuffer(commandBuffer, 0), "vkResetCommandBuffer");
+        VkCommandBufferBeginInfo beginInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+        check(vkBeginCommandBuffer(commandBuffer, &beginInfo), "vkBeginCommandBuffer");
 
-            std::array<VkClearValue, 2> clear{};
-            clear[0].color = {{0.075F, 0.090F, 0.115F, 1.0F}};
-            clear[1].depthStencil = {1.0F, 0};
-            VkRenderPassBeginInfo renderInfo{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
-            renderInfo.renderPass = renderPass_;
-            renderInfo.framebuffer = framebuffers_[i];
-            renderInfo.renderArea.offset = {0, 0};
-            renderInfo.renderArea.extent = swapchainExtent_;
-            renderInfo.clearValueCount = static_cast<std::uint32_t>(clear.size());
-            renderInfo.pClearValues = clear.data();
-            vkCmdBeginRenderPass(commandBuffers_[i], &renderInfo, VK_SUBPASS_CONTENTS_INLINE);
-            VkViewport viewport{};
-            viewport.width = static_cast<float>(swapchainExtent_.width);
-            viewport.height = static_cast<float>(swapchainExtent_.height);
-            viewport.minDepth = 0.0F;
-            viewport.maxDepth = 1.0F;
-            VkRect2D scissor{{0, 0}, swapchainExtent_};
-            vkCmdSetViewport(commandBuffers_[i], 0, 1, &viewport);
-            vkCmdSetScissor(commandBuffers_[i], 0, 1, &scissor);
-            vkCmdBindPipeline(commandBuffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
-            vkCmdDraw(commandBuffers_[i], 36, 1, 0, 0);
-            vkCmdEndRenderPass(commandBuffers_[i]);
-            check(vkEndCommandBuffer(commandBuffers_[i]), "vkEndCommandBuffer");
-        }
+        std::array<VkClearValue, 2> clear{};
+        clear[0].color = {{0.075F, 0.090F, 0.115F, 1.0F}};
+        clear[1].depthStencil = {1.0F, 0};
+        VkRenderPassBeginInfo renderInfo{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
+        renderInfo.renderPass = renderPass_;
+        renderInfo.framebuffer = framebuffers_[imageIndex];
+        renderInfo.renderArea.offset = {0, 0};
+        renderInfo.renderArea.extent = swapchainExtent_;
+        renderInfo.clearValueCount = static_cast<std::uint32_t>(clear.size());
+        renderInfo.pClearValues = clear.data();
+        vkCmdBeginRenderPass(commandBuffer, &renderInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+        int logicalWidth{};
+        int logicalHeight{};
+        glfwGetWindowSize(window_, &logicalWidth, &logicalHeight);
+        const auto rect = editor_ui_.viewport_rect();
+        const float scaleX = logicalWidth > 0 ? static_cast<float>(swapchainExtent_.width) /
+                                               static_cast<float>(logicalWidth) : 1.0F;
+        const float scaleY = logicalHeight > 0 ? static_cast<float>(swapchainExtent_.height) /
+                                                static_cast<float>(logicalHeight) : 1.0F;
+        const std::int32_t x = std::clamp(static_cast<std::int32_t>(rect.x * scaleX), 0,
+                                          static_cast<std::int32_t>(swapchainExtent_.width - 1U));
+        const std::int32_t y = std::clamp(static_cast<std::int32_t>(rect.y * scaleY), 0,
+                                          static_cast<std::int32_t>(swapchainExtent_.height - 1U));
+        const auto maxWidth = swapchainExtent_.width - static_cast<std::uint32_t>(x);
+        const auto maxHeight = swapchainExtent_.height - static_cast<std::uint32_t>(y);
+        const std::uint32_t width = std::clamp(static_cast<std::uint32_t>(std::max(1.0F, rect.width * scaleX)), 1U, maxWidth);
+        const std::uint32_t height = std::clamp(static_cast<std::uint32_t>(std::max(1.0F, rect.height * scaleY)), 1U, maxHeight);
+        VkViewport viewport{};
+        viewport.x = static_cast<float>(x);
+        viewport.y = static_cast<float>(y);
+        viewport.width = static_cast<float>(width);
+        viewport.height = static_cast<float>(height);
+        viewport.minDepth = 0.0F;
+        viewport.maxDepth = 1.0F;
+        VkRect2D scissor{{x, y}, {width, height}};
+        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
+
+        const auto& world = editor_ui_.world();
+        world.each<lic::world::NodeName>([&](lic::world::Entity entity, const lic::world::NodeName&) {
+            if (!world.has<lic::world::Transform>(entity) ||
+                !world.has<lic::world::NodeKindComponent>(entity) ||
+                !world.has<lic::world::Appearance>(entity) ||
+                !world.has<lic::world::NodeEnabled>(entity) ||
+                !world.get<lic::world::NodeEnabled>(entity).value) return;
+            if (!lic::world::node_kind_renders_mesh(world.get<lic::world::NodeKindComponent>(entity).value)) return;
+            const auto& transform = world.get<lic::world::Transform>(entity);
+            const auto& appearance = world.get<lic::world::Appearance>(entity);
+            constexpr float radians = 0.01745329251994329577F;
+            SceneObjectPushConstants push{};
+            for (std::size_t axis = 0; axis < 3; ++axis) {
+                push.position[axis] = transform.position[axis];
+                push.rotation[axis] = transform.rotation_degrees[axis] * radians;
+                push.scale[axis] = transform.scale[axis];
+            }
+            if (editor_ui_.playing()) push.rotation[1] += editor_ui_.play_rotation_degrees() * radians;
+            push.color[0] = appearance.color[0];
+            push.color[1] = appearance.color[1];
+            push.color[2] = appearance.color[2];
+            push.color[3] = appearance.color[3];
+            push.camera[0] = editor_ui_.camera_yaw();
+            push.camera[1] = editor_ui_.camera_pitch();
+            push.camera[2] = editor_ui_.camera_zoom();
+            vkCmdPushConstants(commandBuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0,
+                               static_cast<std::uint32_t>(sizeof(push)), &push);
+            vkCmdDraw(commandBuffer, 36, 1, 0, 0);
+        });
+        editor_ui_.render(commandBuffer);
+        vkCmdEndRenderPass(commandBuffer);
+        check(vkEndCommandBuffer(commandBuffer), "vkEndCommandBuffer");
     }
 
     void create_sync_objects() {
@@ -737,6 +812,7 @@ private:
             }
         }
         check(vkDeviceWaitIdle(device_), "vkDeviceWaitIdle");
+        editor_ui_.shutdown_renderer();
         cleanup_swapchain();
         create_swapchain();
         create_image_views();
@@ -744,6 +820,10 @@ private:
         create_graphics_pipeline();
         create_depth_resources();
         create_framebuffers();
+        const QueueFamilies families = find_queue_families(physicalDevice_);
+        editor_ui_.initialize_renderer(instance_, physicalDevice_, device_, *families.graphics,
+                                       graphicsQueue_, renderPass_,
+                                       static_cast<std::uint32_t>(swapchainImages_.size()));
         create_command_buffers();
         VkSemaphoreCreateInfo semaphoreInfo{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
         for (VkSemaphore& semaphore : renderFinished_) {
@@ -753,10 +833,15 @@ private:
     }
 
     void main_loop() {
-        std::cout << "[LIC][Vulkan] Swapchain ready (" << swapchainExtent_.width << 'x'
-                  << swapchainExtent_.height << "). Close the window to exit.\n";
+        std::cout << "[LIC][Vulkan] Editor UI ready (" << swapchainExtent_.width << 'x'
+                  << swapchainExtent_.height << "). Press F5 to preview and Ctrl+S to save.\n";
+        auto previousFrame = std::chrono::steady_clock::now();
         while (glfwWindowShouldClose(window_) == GLFW_FALSE) {
             glfwPollEvents();
+            const auto now = std::chrono::steady_clock::now();
+            const float delta = std::chrono::duration<float>(now - previousFrame).count();
+            previousFrame = now;
+            editor_ui_.build_frame(delta);
             draw_frame();
         }
         check(vkDeviceWaitIdle(device_), "vkDeviceWaitIdle");
@@ -783,6 +868,7 @@ private:
         }
         imageFences_[imageIndex] = inFlight_[frame];
         check(vkResetFences(device_, 1, &inFlight_[frame]), "vkResetFences");
+        record_command_buffer(imageIndex);
 
         const VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
@@ -877,6 +963,7 @@ private:
     void cleanup() noexcept {
         if (device_ != VK_NULL_HANDLE) {
             vkDeviceWaitIdle(device_);
+            editor_ui_.shutdown_renderer();
             cleanup_swapchain();
             for (std::size_t i = 0; i < imageAvailable_.size(); ++i) {
                 if (imageAvailable_[i] != VK_NULL_HANDLE) {
@@ -892,6 +979,7 @@ private:
             vkDestroyDevice(device_, nullptr);
             device_ = VK_NULL_HANDLE;
         }
+        editor_ui_.shutdown_platform();
         if (surface_ != VK_NULL_HANDLE && instance_ != VK_NULL_HANDLE) {
             vkDestroySurfaceKHR(instance_, surface_, nullptr);
             surface_ = VK_NULL_HANDLE;

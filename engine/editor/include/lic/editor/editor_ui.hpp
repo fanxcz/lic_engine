@@ -3,6 +3,7 @@
 #include <lic/world/scene.hpp>
 #include <vulkan/vulkan.h>
 
+#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <vector>

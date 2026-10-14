@@ -4,13 +4,13 @@
 
 LIC Engine aims to combine the approachable scene workflow of Godot, the level-design and runtime mindset of Source, and the rendering ambition of Unreal—without copying their interfaces or architecture.
 
-> **Project status:** early foundation. The optional Vulkan viewport creates a window, swapchain, depth buffer, and shader-rendered test cube. `LIC::World` provides generation-safe entity handles, typed sparse-set component storage, and component iteration with automated tests. This is not yet a complete editor: mesh import, camera controls, transform hierarchy, material editing, physics, and scene serialization are still in development.
+> **Project status:** early editor milestone. The Windows/Linux Vulkan build now has a Godot-inspired panel layout with a scene tree, transform/material inspector, file system, console, scene save/load, viewport orbit/zoom, and a temporary Play/Stop preview. The viewport renders editable cube nodes using per-object transform/material push constants. This is not yet a full editor: imported glTF meshes, a true transform hierarchy, camera/light rendering, physics, scripts, and a packaged game runtime remain future work.
 
 ## Website and downloads
 
 **[LIC Engine website](https://fanxcz.github.io/lic_engine/)** · **[Windows x64 package](https://github.com/fanxcz/lic_engine/releases/download/continuous/lic-engine-windows-x64.zip)** · [Linux x64 package](https://github.com/fanxcz/lic_engine/releases/download/continuous/lic-engine-linux-x64.tar.gz) · [macOS Apple Silicon core](https://github.com/fanxcz/lic_engine/releases/download/continuous/lic-engine-macos-arm64-core.tar.gz) · [Build logs](https://github.com/fanxcz/lic_engine/actions/workflows/build-binaries.yml)
 
-**Windows: download the complete ZIP, extract every file, then run `run-lic-engine.bat`. Do not download or move `lic_editor.exe` by itself.** The Vulkan build needs `vulkan-1.dll` and the adjacent `shaders\\` folder. Startup failures now create `lic-engine-startup.log` and show an error dialog; the batch launcher keeps the console open if the program exits with an error. The complete package is the supported way to launch the graphical viewport.
+**Windows: download the complete ZIP, extract every file, then run `run-lic-engine.bat`. Do not download or move `lic_editor.exe` by itself.** The Vulkan build needs `vulkan-1.dll` and the adjacent `shaders\\` folder. Startup failures now create `lic-engine-startup.log` and show an error dialog; the batch launcher keeps the console open if the program exits with an error. The complete package is the supported way to launch the graphical viewport. Project files are stored in the current user's application-data directory, and the FileSystem panel lists the project's Scenes and Assets.
 
 ## Design principles
 

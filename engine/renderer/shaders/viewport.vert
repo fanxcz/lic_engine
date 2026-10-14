@@ -2,6 +2,14 @@
 
 layout(location = 0) out vec3 outColor;
 
+layout(push_constant) uniform SceneObjectPushConstants {
+    vec4 position;
+    vec4 rotation;
+    vec4 scale;
+    vec4 color;
+    vec4 camera;
+} objectData;
+
 const vec3 positions[8] = vec3[](
     vec3(-0.62, -0.62, -0.62),
     vec3( 0.62, -0.62, -0.62),
@@ -12,7 +20,6 @@ const vec3 positions[8] = vec3[](
     vec3( 0.62,  0.62,  0.62),
     vec3(-0.62,  0.62,  0.62)
 );
-
 const int indices[36] = int[](
     4, 5, 6, 6, 7, 4,
     1, 0, 3, 3, 2, 1,
@@ -23,25 +30,28 @@ const int indices[36] = int[](
 );
 
 void main() {
-    vec3 p = positions[indices[gl_VertexIndex]];
+    vec3 p = positions[indices[gl_VertexIndex]] * objectData.scale.xyz;
+    float rx = objectData.rotation.x;
+    float ry = objectData.rotation.y;
+    float rz = objectData.rotation.z;
+    p = vec3(p.x, cos(rx) * p.y - sin(rx) * p.z, sin(rx) * p.y + cos(rx) * p.z);
+    p = vec3(cos(ry) * p.x + sin(ry) * p.z, p.y, -sin(ry) * p.x + cos(ry) * p.z);
+    p = vec3(cos(rz) * p.x - sin(rz) * p.y, sin(rz) * p.x + cos(rz) * p.y, p.z);
+    p += objectData.position.xyz;
 
-    // A fixed, slightly isometric camera is enough for the renderer smoke scene.
-    float cy = cos(0.68);
-    float sy = sin(0.68);
-    float cx = cos(0.38);
-    float sx = sin(0.38);
+    float cy = cos(objectData.camera.x);
+    float sy = sin(objectData.camera.x);
+    float cx = cos(objectData.camera.y);
+    float sx = sin(objectData.camera.y);
     p = vec3(cy * p.x + sy * p.z, p.y, -sy * p.x + cy * p.z);
     p = vec3(p.x, cx * p.y - sx * p.z, sx * p.y + cx * p.z);
+    gl_Position = vec4(p.x * 0.72 * objectData.camera.z,
+                       p.y * 0.72 * objectData.camera.z, 0.5 + p.z * 0.10, 1.0);
 
-    gl_Position = vec4(p.x * 0.92, p.y * 0.92, 0.5 + p.z * 0.25, 1.0);
-
-    const vec3 faceColors[6] = vec3[](
-        vec3(0.33, 0.62, 0.91),
-        vec3(0.16, 0.29, 0.45),
-        vec3(0.24, 0.47, 0.70),
-        vec3(0.42, 0.72, 0.94),
-        vec3(0.18, 0.34, 0.52),
-        vec3(0.52, 0.77, 0.94)
+    const vec3 faceShade[6] = vec3[](
+        vec3(0.72, 0.84, 1.00), vec3(0.42, 0.54, 0.72),
+        vec3(0.62, 0.76, 0.94), vec3(0.95, 1.00, 1.00),
+        vec3(0.48, 0.61, 0.79), vec3(0.86, 0.94, 1.00)
     );
-    outColor = faceColors[gl_VertexIndex / 6];
+    outColor = faceShade[gl_VertexIndex / 6] * objectData.color.rgb;
 }

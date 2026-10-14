@@ -37,15 +37,16 @@ A milestone is not complete because directories or placeholder classes exist. Ea
 
 ## M3 — Editor essentials
 
-- [ ] Dockable editor shell with viewport, hierarchy, inspector, and console.
-- [ ] Orbit/fly camera and focus-selection behavior.
-- [ ] Select, create, duplicate, rename, and delete entities.
-- [ ] Transform gizmos and snapping.
-- [ ] Edit component values and save scenes.
-- [ ] Dirty-state indicator and basic undo/redo.
-- [ ] Play/stop using the runtime scene format.
+- [x] Initial editor shell with a 3D viewport, scene tree, inspector, FileSystem, Output and Console panels (fixed compact layout; docking/resizing still planned).
+- [x] Orbit/zoom camera controls in the viewport.
+- [x] Create, select, duplicate, rename, enable/disable, and delete nodes.
+- [x] Edit transform values and primitive material color.
+- [x] Save/load versioned `.licscene` files with malformed-file validation.
+- [x] Dirty-state indicator and unsaved-scene prompt.
+- [x] Play/stop preview with temporary mesh rotation (not yet a standalone game runtime).
+- [ ] Transform gizmos, hierarchy parenting, undo/redo, and true camera/light components.
 
-**Exit criteria:** create a small scene without editing source, save, play, stop, and reopen it.
+**Exit criteria:** create a primitive scene without editing source, save it, reopen it, and run a temporary preview.
 
 ## M4 — Gameplay loop
 

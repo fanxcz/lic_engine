@@ -469,8 +469,10 @@ void EditorUi::draw_hierarchy() {
                 }
                 if (ImGui::BeginPopupContextItem("NodeContext")) {
                     selected_entity_ = entity;
-                    duplicateRequested = ImGui::MenuItem("Duplicate");
-                    deleteRequested = ImGui::MenuItem("Delete");
+                    const bool rowDuplicate = ImGui::MenuItem("Duplicate");
+                    const bool rowDelete = ImGui::MenuItem("Delete");
+                    duplicateRequested = duplicateRequested || rowDuplicate;
+                    deleteRequested = deleteRequested || rowDelete;
                     ImGui::EndPopup();
                 }
                 ImGui::PopID();

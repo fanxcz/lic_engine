@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added a Dear ImGui editor shell with scene tree, transform/material inspector, FileSystem, Output and Console panels.
+- Added editable mesh-node transforms/material colors, node create/duplicate/delete, viewport orbit/zoom and a temporary Play/Stop preview.
+- Added versioned scene save/load and malformed-file validation tests.
+- Added per-object push constants so scene transforms and primitive colors affect the Vulkan preview.
+
 - Added a compact, responsive dark website with honest project status and platform downloads.
 - Added GitHub Pages deployment for the `site/` directory.
 - Made the complete Windows ZIP the supported download; legacy standalone EXE assets are removed because they omit required runtime files.

@@ -53,10 +53,10 @@ if(LIC_ENGINE_ENABLE_VULKAN)
     find_program(LIC_GLSLC_EXECUTABLE NAMES glslc
         HINTS "$ENV{VULKAN_SDK}/Bin" "$ENV{VULKAN_SDK}/bin")
 
+    include(FetchContent)
     if(Vulkan_FOUND AND LIC_GLSLC_EXECUTABLE
        AND NOT TARGET glfw AND NOT TARGET glfw3::glfw
        AND LIC_ENGINE_FETCH_GLFW)
-        include(FetchContent)
         set(GLFW_BUILD_DOCS OFF CACHE BOOL "Disable GLFW documentation builds" FORCE)
         set(GLFW_BUILD_TESTS OFF CACHE BOOL "Disable GLFW test builds" FORCE)
         set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "Disable GLFW example builds" FORCE)
@@ -73,6 +73,40 @@ if(LIC_ENGINE_ENABLE_VULKAN)
     endif()
 
     if(Vulkan_FOUND AND (TARGET glfw OR TARGET glfw3::glfw) AND LIC_GLSLC_EXECUTABLE)
+        if(TARGET glfw)
+            set(LIC_GLFW_TARGET glfw)
+        else()
+            set(LIC_GLFW_TARGET glfw3::glfw)
+        endif()
+
+        FetchContent_Declare(
+            imgui
+            GIT_REPOSITORY https://github.com/ocornut/imgui.git
+            GIT_TAG v1.91.9b
+            GIT_SHALLOW TRUE
+        )
+        FetchContent_GetProperties(imgui)
+        if(NOT imgui_POPULATED)
+            FetchContent_Populate(imgui)
+        endif()
+
+        add_library(lic_imgui STATIC
+            ${imgui_SOURCE_DIR}/imgui.cpp
+            ${imgui_SOURCE_DIR}/imgui_draw.cpp
+            ${imgui_SOURCE_DIR}/imgui_tables.cpp
+            ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+            ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+            ${imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp
+        )
+        add_library(LIC::ImGui ALIAS lic_imgui)
+        target_include_directories(lic_imgui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
+        target_link_libraries(lic_imgui PUBLIC Vulkan::Vulkan ${LIC_GLFW_TARGET})
+
+        add_library(lic_editor_ui engine/editor/src/editor_ui.cpp)
+        add_library(LIC::EditorUI ALIAS lic_editor_ui)
+        target_include_directories(lic_editor_ui PUBLIC engine/editor/include)
+        target_link_libraries(lic_editor_ui PUBLIC LIC::World LIC::ImGui lic_build_options)
+
         set(LIC_SHADER_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/renderer_shaders")
         set(LIC_VERTEX_SPIRV "${LIC_SHADER_OUTPUT_DIR}/viewport.vert.spv")
         set(LIC_FRAGMENT_SPIRV "${LIC_SHADER_OUTPUT_DIR}/viewport.frag.spv")
@@ -101,6 +135,7 @@ if(LIC_ENGINE_ENABLE_VULKAN)
         add_library(LIC::Renderer ALIAS lic_renderer)
         add_dependencies(lic_renderer lic_renderer_shaders)
         target_include_directories(lic_renderer PUBLIC engine/renderer/include)
+        target_link_libraries(lic_renderer PUBLIC LIC::EditorUI)
         if(TARGET glfw)
             target_link_libraries(lic_renderer PUBLIC Vulkan::Vulkan glfw)
         else()

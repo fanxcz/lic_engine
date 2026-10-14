@@ -1,7 +1,9 @@
 #include <lic/core/version.hpp>
-#include <lic/world/world.hpp>
+#include <lic/world/scene.hpp>
 
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -108,9 +110,68 @@ void test_world_entity_lifecycle() {
 
 } // namespace
 
+void test_scene_serialization() {
+    const auto folder = std::filesystem::temp_directory_path() / "lic-engine-scene-tests";
+    const auto scenePath = folder / "roundtrip.licscene";
+    const auto brokenPath = folder / "broken.licscene";
+    std::error_code ignored;
+    std::filesystem::remove_all(folder, ignored);
+    std::filesystem::create_directories(folder);
+
+    lic::world::World source;
+    (void)lic::world::create_node(source, lic::world::NodeKind::Node3D, "World");
+    lic::world::Transform transform;
+    transform.position = {1.25F, -2.0F, 3.5F};
+    transform.rotation_degrees = {10.0F, 20.0F, -30.0F};
+    transform.scale = {0.5F, 0.75F, 1.25F};
+    lic::world::Appearance appearance;
+    appearance.color = {0.2F, 0.4F, 0.8F, 1.0F};
+    const auto cube = lic::world::create_node(source, lic::world::NodeKind::MeshInstance3D,
+                                               "Cube with spaces", transform, appearance);
+    source.get<lic::world::NodeEnabled>(cube).value = false;
+    lic::world::save_scene(source, scenePath);
+
+    lic::world::World loaded;
+    (void)lic::world::create_node(loaded, lic::world::NodeKind::Node3D, "Old scene");
+    lic::world::load_scene(loaded, scenePath);
+    expect(loaded.entity_count() == 2, "scene load should replace the active world atomically");
+
+    bool foundCube = false;
+    loaded.each<lic::world::NodeName>([&](lic::world::Entity entity, const lic::world::NodeName& name) {
+        if (name.value != "Cube with spaces") return;
+        foundCube = true;
+        const auto& restored = loaded.get<lic::world::Transform>(entity);
+        const auto& restoredAppearance = loaded.get<lic::world::Appearance>(entity);
+        expect(restored.position[0] == 1.25F && restored.position[1] == -2.0F,
+               "scene round trip should preserve positions");
+        expect(restored.rotation_degrees[2] == -30.0F, "scene round trip should preserve rotations");
+        expect(restored.scale[1] == 0.75F, "scene round trip should preserve scales");
+        expect(restoredAppearance.color[2] == 0.8F, "scene round trip should preserve material color");
+        expect(!loaded.get<lic::world::NodeEnabled>(entity).value, "scene round trip should preserve enabled state");
+    });
+    expect(foundCube, "scene round trip should preserve names with spaces");
+
+    {
+        std::ofstream broken(brokenPath, std::ios::binary | std::ios::trunc);
+        broken << "LICSCENE 1\nnodes 1\nnode 99 \"bad\" 0 0 0 0 0 0 1 1 1 1 1 1 1 1\n";
+    }
+    const auto entityCountBeforeBrokenLoad = loaded.entity_count();
+    bool invalidFileRejected = false;
+    try {
+        lic::world::load_scene(loaded, brokenPath);
+    } catch (const std::runtime_error&) {
+        invalidFileRejected = true;
+    }
+    expect(invalidFileRejected, "malformed scene files should be rejected");
+    expect(loaded.entity_count() == entityCountBeforeBrokenLoad,
+           "a failed load must leave the current scene unchanged");
+    std::filesystem::remove_all(folder, ignored);
+}
+
 int main() {
     test_version();
     test_world_entity_lifecycle();
-    std::cout << "LIC Engine core and world tests passed.\n";
+    test_scene_serialization();
+    std::cout << "LIC Engine core, world and scene tests passed.\n";
     return EXIT_SUCCESS;
 }
