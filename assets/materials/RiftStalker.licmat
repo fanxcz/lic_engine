@@ -1,0 +1,6 @@
+LICMAT 1
+name "Rift Stalker"
+base_color 0.94 0.29 0.24 1.0
+metallic 0.22
+roughness 0.38
+emission 0.08

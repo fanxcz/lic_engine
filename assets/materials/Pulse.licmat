@@ -1,0 +1,6 @@
+LICMAT 1
+name "Pulse"
+base_color 0.24 0.80 1.0 1.0
+metallic 0.05
+roughness 0.18
+emission 1.15

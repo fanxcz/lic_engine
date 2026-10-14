@@ -1,0 +1,6 @@
+LICMAT 1
+name "Rift Brute"
+base_color 0.94 0.31 0.54 1.0
+metallic 0.58
+roughness 0.22
+emission 0.32

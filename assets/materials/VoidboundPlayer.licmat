@@ -1,0 +1,6 @@
+LICMAT 1
+name "Voidbound Player"
+base_color 0.25 0.92 0.98 1.0
+metallic 0.45
+roughness 0.22
+emission 0.20

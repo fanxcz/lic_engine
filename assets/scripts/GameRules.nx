@@ -1,0 +1,64 @@
+// NEXUS is the authoritative balance sheet for VOIDBOUND.
+// Return integer values so the built-in NEXUS native backend can build this script
+// without LLVM. LIC Engine validates every value before using it.
+fn player_health() -> i64 { return 100 }
+fn player_speed() -> i64 { return 230 }
+fn enemy_speed() -> i64 { return 68 }
+fn fire_interval_ms() -> i64 { return 240 }
+fn dash_cooldown_ms() -> i64 { return 1350 }
+
+fn enemy_spawn_base() -> i64 { return 4 }
+fn enemy_spawn_per_wave() -> i64 { return 2 }
+fn enemy_spawn_cap() -> i64 { return 28 }
+fn enemy_health_base() -> i64 { return 200 }
+fn enemy_health_per_wave() -> i64 { return 20 }
+fn elite_health_bonus() -> i64 { return 200 }
+fn elite_start_wave() -> i64 { return 3 }
+fn elite_every_n() -> i64 { return 5 }
+fn score_per_reward() -> i64 { return 100 }
+
+fn experience_initial_threshold() -> i64 { return 5 }
+fn experience_threshold_base() -> i64 { return 4 }
+fn experience_threshold_per_level() -> i64 { return 2 }
+fn experience_pickup_lifetime_seconds() -> i64 { return 18 }
+
+fn spawn_interval_base_ms() -> i64 { return 950 }
+fn spawn_interval_wave_reduction_ms() -> i64 { return 35 }
+fn spawn_interval_min_ms() -> i64 { return 320 }
+
+fn rapid_fire_interval_percent() -> i64 { return 75 }
+fn heavy_round_damage() -> i64 { return 1 }
+fn vitality_health_bonus() -> i64 { return 25 }
+fn vitality_heal_amount() -> i64 { return 45 }
+fn mobility_speed_bonus() -> i64 { return 28 }
+fn mobility_dash_cooldown_ms() -> i64 { return 350 }
+
+fn main() {
+    print("LICCFG_PLAYER_HEALTH=" + str_i64(player_health()))
+    print("LICCFG_PLAYER_SPEED=" + str_i64(player_speed()))
+    print("LICCFG_ENEMY_SPEED=" + str_i64(enemy_speed()))
+    print("LICCFG_FIRE_INTERVAL_MS=" + str_i64(fire_interval_ms()))
+    print("LICCFG_DASH_COOLDOWN_MS=" + str_i64(dash_cooldown_ms()))
+    print("LICCFG_ENEMY_SPAWN_BASE=" + str_i64(enemy_spawn_base()))
+    print("LICCFG_ENEMY_SPAWN_PER_WAVE=" + str_i64(enemy_spawn_per_wave()))
+    print("LICCFG_ENEMY_SPAWN_CAP=" + str_i64(enemy_spawn_cap()))
+    print("LICCFG_ENEMY_HEALTH_BASE=" + str_i64(enemy_health_base()))
+    print("LICCFG_ENEMY_HEALTH_PER_WAVE=" + str_i64(enemy_health_per_wave()))
+    print("LICCFG_ELITE_HEALTH_BONUS=" + str_i64(elite_health_bonus()))
+    print("LICCFG_ELITE_START_WAVE=" + str_i64(elite_start_wave()))
+    print("LICCFG_ELITE_EVERY_N=" + str_i64(elite_every_n()))
+    print("LICCFG_SCORE_PER_REWARD=" + str_i64(score_per_reward()))
+    print("LICCFG_EXPERIENCE_INITIAL_THRESHOLD=" + str_i64(experience_initial_threshold()))
+    print("LICCFG_EXPERIENCE_THRESHOLD_BASE=" + str_i64(experience_threshold_base()))
+    print("LICCFG_EXPERIENCE_THRESHOLD_PER_LEVEL=" + str_i64(experience_threshold_per_level()))
+    print("LICCFG_EXPERIENCE_PICKUP_LIFETIME_SECONDS=" + str_i64(experience_pickup_lifetime_seconds()))
+    print("LICCFG_SPAWN_INTERVAL_BASE_MS=" + str_i64(spawn_interval_base_ms()))
+    print("LICCFG_SPAWN_INTERVAL_WAVE_REDUCTION_MS=" + str_i64(spawn_interval_wave_reduction_ms()))
+    print("LICCFG_SPAWN_INTERVAL_MIN_MS=" + str_i64(spawn_interval_min_ms()))
+    print("LICCFG_RAPID_FIRE_INTERVAL_PERCENT=" + str_i64(rapid_fire_interval_percent()))
+    print("LICCFG_HEAVY_ROUND_DAMAGE=" + str_i64(heavy_round_damage()))
+    print("LICCFG_VITALITY_HEALTH_BONUS=" + str_i64(vitality_health_bonus()))
+    print("LICCFG_VITALITY_HEAL_AMOUNT=" + str_i64(vitality_heal_amount()))
+    print("LICCFG_MOBILITY_SPEED_BONUS=" + str_i64(mobility_speed_bonus()))
+    print("LICCFG_MOBILITY_DASH_COOLDOWN_MS=" + str_i64(mobility_dash_cooldown_ms()))
+}

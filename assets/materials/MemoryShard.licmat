@@ -1,0 +1,6 @@
+LICMAT 1
+name "Memory Shard"
+base_color 0.96 0.76 0.27 1.0
+metallic 0.62
+roughness 0.24
+emission 0.55
