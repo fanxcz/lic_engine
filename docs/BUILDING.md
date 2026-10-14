@@ -15,6 +15,24 @@ LIC Engine can be built in two modes:
 - For the viewport: Vulkan SDK or system Vulkan development headers/loader, GLFW 3 development files, and the `glslc` shader compiler
 - A desktop session and Vulkan-capable driver to run the viewport
 
+## Windows 11: download and launch the graphical build
+
+1. Download the [complete Windows x64 ZIP](https://github.com/fanxcz/lic_engine/releases/download/continuous/lic-engine-windows-x64.zip).
+2. Extract the **entire archive** into a normal writable folder.
+3. Run `run-lic-engine.bat`, not a copied EXE from inside or outside the archive.
+
+The executable needs `vulkan-1.dll` and the `shaders\\` folder beside it. The standalone EXE is intentionally no longer published by itself because it is not a complete graphical package. If startup fails, the application shows an error dialog and writes `lic-engine-startup.log` beside the executable (or in the system temporary directory if that folder cannot be written). The batch launcher prints the log and pauses on errors.
+
+For diagnosis, open PowerShell in the extracted folder and run:
+
+```powershell
+.\lic_editor.exe --version
+.\lic_editor.exe --diagnostics
+.\run-lic-engine.bat
+```
+
+Attach `lic-engine-startup.log` or the exact console message when reporting a remaining startup failure.
+
 ## Windows 11: build the local executable
 
 Open PowerShell in the repository root. The script configures a clean x64 build, compiles, runs CTest, checks the executable version, and creates a ZIP package:
@@ -30,7 +48,7 @@ If the Vulkan SDK and its `glslc.exe` are not installed, the script still builds
 .\tools\build-windows.ps1 -CoreOnly
 ```
 
-Output: `dist\lic-engine-windows-x64.zip` and `dist\lic-engine-windows-x64\lic_editor.exe`. For a graphical viewport, install the [LunarG Vulkan SDK](https://vulkan.lunarg.com/sdk/home), reopen PowerShell so `VULKAN_SDK` is available, and run the script again. GLFW 3.4 is fetched by CMake only when the Vulkan SDK is detected.
+Output: `dist\lic-engine-windows-x64.zip`, `dist\lic-engine-windows-x64\lic_editor.exe`, and `dist\lic-engine-windows-x64\run-lic-engine.bat`. For a graphical viewport, install the [LunarG Vulkan SDK](https://vulkan.lunarg.com/sdk/home), reopen PowerShell so `VULKAN_SDK` is available, and run the script again. GLFW 3.4 is fetched by CMake only when the Vulkan SDK is detected.
 
 ## Windows 11: build and download all platform packages
 

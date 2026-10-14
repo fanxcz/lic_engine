@@ -1,5 +1,15 @@
 #include <lic/renderer/vulkan_viewport.hpp>
 
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -60,14 +70,54 @@ public:
             cleanup();
             return 0;
         } catch (const std::exception& error) {
-            std::cerr << "[LIC][Vulkan] " << error.what() << '\n';
             cleanup();
+            report_startup_error(error.what());
             return 1;
         }
     }
 
 private:
     std::filesystem::path shaderDirectory_;
+
+    void report_startup_error(std::string_view details) const noexcept {
+        std::filesystem::path logPath = shaderDirectory_.parent_path() / "lic-engine-startup.log";
+        const auto writeLog = [details](const std::filesystem::path& path) noexcept {
+            try {
+                std::ofstream log(path, std::ios::binary | std::ios::trunc);
+                if (!log) return false;
+                log << "LIC Engine failed to start the Vulkan viewport.\n"
+                    << "Details: " << details << "\n\n"
+                    << "If the error mentions a compiled shader or runtime DLL, download and extract the complete "
+                       "Windows ZIP package. Keep lic_editor.exe, vulkan-1.dll, and the shaders folder together.\n";
+                log.flush();
+                return static_cast<bool>(log);
+            } catch (...) { return false; }
+        };
+
+        bool logged = writeLog(logPath);
+        if (!logged) {
+            try {
+                logPath = std::filesystem::temp_directory_path() / "lic-engine-startup.log";
+                logged = writeLog(logPath);
+            } catch (...) { logged = false; }
+        }
+        std::cerr << "[LIC][Vulkan] " << details << '\n';
+        if (logged) std::cerr << "[LIC][Vulkan] Startup details were saved to lic-engine-startup.log.\n";
+#ifdef _WIN32
+        std::wstring message =
+            L"LIC Engine could not start the 3D viewport.\n\n"
+            L"Download and extract the complete Windows ZIP package. Do not move lic_editor.exe by itself.\n\n";
+        if (logged) {
+            message += L"Error details were saved to:\n";
+            try { message += logPath.wstring(); }
+            catch (...) { message += L"lic-engine-startup.log"; }
+        } else {
+            message += L"The error log could not be written. Run run-lic-engine.bat to keep console output visible.";
+        }
+        MessageBoxW(nullptr, message.c_str(), L"LIC Engine - startup error",
+                    MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+#endif
+    }
     GLFWwindow* window_{};
     VkInstance instance_{};
     VkSurfaceKHR surface_{};

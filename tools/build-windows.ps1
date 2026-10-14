@@ -76,12 +76,47 @@ if (Test-Path $shaderDir) {
     New-Item -ItemType Directory -Force -Path $packageShaders | Out-Null
     Copy-Item (Join-Path $shaderDir "*") $packageShaders -Recurse -Force
 }
-if ($enableVulkan -and $vulkanSdk) {
-    $vulkanLoader = Join-Path $vulkanSdk "Runtime/x64/vulkan-1.dll"
-    if (Test-Path $vulkanLoader) {
-        Copy-Item $vulkanLoader (Join-Path $packageDir "vulkan-1.dll") -Force
+if ($enableVulkan) {
+    $loaderCandidates = @()
+    if ($vulkanSdk) {
+        $loaderCandidates += Join-Path $vulkanSdk "Runtime/x64/vulkan-1.dll"
+        $loaderCandidates += Join-Path $vulkanSdk "Bin/vulkan-1.dll"
     }
+    if ($env:WINDIR) { $loaderCandidates += Join-Path $env:WINDIR "System32/vulkan-1.dll" }
+    $vulkanLoader = $null
+    foreach ($candidate in $loaderCandidates) {
+        if ($candidate -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            $vulkanLoader = $candidate
+            break
+        }
+    }
+    if (-not $vulkanLoader) {
+        throw "The Vulkan viewport was built, but vulkan-1.dll could not be packaged. Check the Vulkan SDK installation."
+    }
+    Copy-Item $vulkanLoader (Join-Path $packageDir "vulkan-1.dll") -Force
 }
+Set-Content -Encoding ascii (Join-Path $packageDir "run-lic-engine.bat") -Value @(
+    "@echo off",
+    "setlocal",
+    'cd /d "%~dp0"',
+    'if not exist "lic_editor.exe" (',
+    "  echo LIC Engine executable is missing from this package.",
+    "  pause",
+    "  exit /b 2",
+    ")",
+    '"lic_editor.exe" %*',
+    'set "exitCode=%ERRORLEVEL%"',
+    'if not "%exitCode%"=="0" (',
+    "  echo.",
+    '  echo LIC Engine exited with code %exitCode%.',
+    '  if exist "lic-engine-startup.log" (',
+    "    echo Startup log:",
+    '    type "lic-engine-startup.log"',
+    "  )",
+    "  pause",
+    ")",
+    "exit /b %exitCode%"
+)
 Copy-Item (Join-Path $repoRoot "README.md") (Join-Path $packageDir "README.md") -Force
 Copy-Item (Join-Path $repoRoot "docs/BUILDING.md") (Join-Path $packageDir "BUILDING.md") -Force
 

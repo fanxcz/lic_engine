@@ -43,6 +43,9 @@ target_link_libraries(lic_world INTERFACE lic_build_options)
 
 add_executable(lic_editor editor/src/main.cpp)
 target_link_libraries(lic_editor PRIVATE LIC::Core lic_build_options)
+if(WIN32)
+    target_link_libraries(lic_editor PRIVATE user32)
+endif()
 
 if(LIC_ENGINE_ENABLE_VULKAN)
     find_package(Vulkan QUIET)

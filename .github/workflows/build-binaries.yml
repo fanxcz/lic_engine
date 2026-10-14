@@ -49,16 +49,45 @@ jobs:
           }
           New-Item -ItemType Directory -Force -Path "$package/shaders" | Out-Null
           Copy-Item "build/Release/shaders/*" "$package/shaders" -Recurse -Force
+          $loaderCandidates = @()
           if ($env:VULKAN_SDK) {
-            $loader = Join-Path $env:VULKAN_SDK "Runtime/x64/vulkan-1.dll"
-            if (Test-Path $loader) { Copy-Item $loader "$package/vulkan-1.dll" -Force }
+            $loaderCandidates += Join-Path $env:VULKAN_SDK "Runtime/x64/vulkan-1.dll"
+            $loaderCandidates += Join-Path $env:VULKAN_SDK "Bin/vulkan-1.dll"
           }
+          if ($env:WINDIR) { $loaderCandidates += Join-Path $env:WINDIR "System32/vulkan-1.dll" }
+          $loader = $null
+          foreach ($candidate in $loaderCandidates) {
+            if ($candidate -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+              $loader = $candidate
+              break
+            }
+          }
+          if (-not $loader) { throw "Vulkan loader vulkan-1.dll was not found; refusing to ship an incomplete Windows package." }
+          Copy-Item $loader "$package/vulkan-1.dll" -Force
+          if (-not (Test-Path "$package/vulkan-1.dll")) { throw "Missing packaged Vulkan loader." }
           Copy-Item "README.md" "$package/README.md"
           Copy-Item "docs/BUILDING.md" "$package/BUILDING.md"
           Set-Content -Encoding ascii "$package/run-lic-engine.bat" -Value @(
             "@echo off",
+            "setlocal",
             'cd /d "%~dp0"',
-            "lic_editor.exe %*"
+            'if not exist "lic_editor.exe" (',
+            "  echo LIC Engine executable is missing from this package.",
+            "  pause",
+            "  exit /b 2",
+            ")",
+            '"lic_editor.exe" %*',
+            'set "exitCode=%ERRORLEVEL%"',
+            'if not "%exitCode%"=="0" (',
+            "  echo.",
+            '  echo LIC Engine exited with code %exitCode%.',
+            '  if exist "lic-engine-startup.log" (',
+            "    echo Startup log:",
+            '    type "lic-engine-startup.log"',
+            "  )",
+            "  pause",
+            ")",
+            "exit /b %exitCode%"
           )
           & "$package/lic_editor.exe" --version
           if ($LASTEXITCODE -ne 0) { throw "The packaged executable failed its version smoke test." }
@@ -191,14 +220,34 @@ jobs:
           path: release-assets
           merge-multiple: true
 
-      - name: Extract standalone Windows executable
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f release-assets/lic-engine-windows-x64.zip
-          unzip -p release-assets/lic-engine-windows-x64.zip lic_editor.exe > release-assets/lic_editor.exe
-          test -s release-assets/lic_editor.exe
-          sha256sum release-assets/lic_editor.exe > release-assets/lic_editor.exe.sha256
+      - name: Remove non-portable standalone EXE assets from the release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = context.eventName === 'push' && context.ref.startsWith('refs/tags/')
+              ? context.ref.slice('refs/tags/'.length)
+              : 'continuous';
+            let release;
+            try {
+              ({ data: release } = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag
+              }));
+            } catch (error) {
+              if (error.status === 404) return;
+              throw error;
+            }
+            for (const asset of release.assets) {
+              if (asset.name === 'lic_editor.exe' || asset.name === 'lic_editor.exe.sha256') {
+                await github.rest.repos.deleteReleaseAsset({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  asset_id: asset.id
+                });
+                core.info('Removed non-portable asset: ' + asset.name);
+              }
+            }
 
       - name: Publish downloadable binaries
         uses: softprops/action-gh-release@v2
@@ -207,8 +256,6 @@ jobs:
           prerelease: ${{ github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' }}
           make_latest: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
           files: |
-            release-assets/lic_editor.exe
-            release-assets/lic_editor.exe.sha256
             release-assets/lic-engine-windows-x64.zip
             release-assets/lic-engine-linux-x64.tar.gz
             release-assets/lic-engine-macos-arm64-core.tar.gz

@@ -9,6 +9,16 @@
 #include <iostream>
 #include <string_view>
 
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
 int main(int argc, char** argv) {
     if (argc > 1) {
         const std::string_view argument{argv[1]};
@@ -43,6 +53,19 @@ int main(int argc, char** argv) {
     if (argc == 1) {
         return lic::renderer::run_vulkan_viewport(std::filesystem::absolute(std::filesystem::path(argv[0])));
     }
+#else
+#ifdef _WIN32
+    // Explain core-only builds instead of closing silently after a double-click.
+    if (argc == 1) {
+        lic::core::print_build_information(std::cout);
+        MessageBoxW(nullptr,
+                    L"This build contains the engine core only, without the 3D viewport.\n\n"
+                    L"Download and extract the complete Windows ZIP package from the LIC Engine website.",
+                    L"LIC Engine - viewport unavailable",
+                    MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
+        return 3;
+    }
+#endif
 #endif
     lic::core::print_build_information(std::cout);
     return 0;

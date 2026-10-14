@@ -4,13 +4,13 @@
 
 LIC Engine aims to combine the approachable scene workflow of Godot, the level-design and runtime mindset of Source, and the rendering ambition of Unreal—without copying their interfaces or architecture.
 
-> **Project status:** early foundation. The optional native Vulkan viewport opens a GLFW window, selects a Vulkan-capable device, builds a swapchain/render pass/depth buffer and draws a shader-based colored cube. The new `LIC::World` module provides generation-safe entity handles, typed sparse-set component storage, and mutable/const component iteration, covered by automated lifecycle tests. This is not yet a full editor: imported meshes, camera controls, scene hierarchy, material editing, physics, scene serialization, and runtime packaging remain future work.
+> **Project status:** early foundation. The optional Vulkan viewport creates a window, swapchain, depth buffer, and shader-rendered test cube. `LIC::World` provides generation-safe entity handles, typed sparse-set component storage, and component iteration with automated tests. This is not yet a complete editor: mesh import, camera controls, transform hierarchy, material editing, physics, and scene serialization are still in development.
 
-## Download for Windows 11
+## Website and downloads
 
-**[Download LIC Engine for Windows — EXE](https://github.com/fanxcz/lic_engine/releases/download/continuous/lic_editor.exe)** · **[Download the complete Windows package (EXE + Vulkan shaders)](https://github.com/fanxcz/lic_engine/releases/download/continuous/lic-engine-windows-x64.zip)** · [All build results](https://github.com/fanxcz/lic_engine/actions/workflows/build-binaries.yml)
+**[LIC Engine website](https://fanxcz.github.io/lic_engine/)** · **[Windows x64 package](https://github.com/fanxcz/lic_engine/releases/download/continuous/lic-engine-windows-x64.zip)** · [Linux x64 package](https://github.com/fanxcz/lic_engine/releases/download/continuous/lic-engine-linux-x64.tar.gz) · [macOS Apple Silicon core](https://github.com/fanxcz/lic_engine/releases/download/continuous/lic-engine-macos-arm64-core.tar.gz) · [Build logs](https://github.com/fanxcz/lic_engine/actions/workflows/build-binaries.yml)
 
-The standalone `lic_editor.exe` is provided for quick access, but the graphical viewport needs the adjacent `shaders\` directory and a Vulkan-capable graphics driver. For normal use, download and extract the complete ZIP, then double-click `run-lic-engine.bat`. The continuous download is refreshed automatically after a successful build from `main` and when the workflow is started manually. If GitHub Actions has not completed its first successful run yet, open [Build platform binaries](https://github.com/fanxcz/lic_engine/actions/workflows/build-binaries.yml). The full package is the recommended way to run the graphical viewport.
+**Windows: download the complete ZIP, extract every file, then run `run-lic-engine.bat`. Do not download or move `lic_editor.exe` by itself.** The Vulkan build needs `vulkan-1.dll` and the adjacent `shaders\\` folder. Startup failures now create `lic-engine-startup.log` and show an error dialog; the batch launcher keeps the console open if the program exits with an error. The complete package is the supported way to launch the graphical viewport.
 
 ## Design principles
 
