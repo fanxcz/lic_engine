@@ -1,11 +1,12 @@
 #include <lic/renderer/vulkan_viewport.hpp>
 
+#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
-#include <vulkan/vulkan.h>
 
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -48,6 +49,9 @@ struct SwapchainSupport {
 
 class VulkanViewport final {
 public:
+    explicit VulkanViewport(const std::filesystem::path& executablePath)
+        : shaderDirectory_(executablePath.parent_path() / "shaders") {}
+
     int run() {
         try {
             initialize_window();
@@ -63,6 +67,7 @@ public:
     }
 
 private:
+    std::filesystem::path shaderDirectory_;
     GLFWwindow* window_{};
     VkInstance instance_{};
     VkSurfaceKHR surface_{};
@@ -482,21 +487,22 @@ private:
     }
 
     std::vector<std::uint32_t> read_shader(const std::string& filename) const {
-        std::ifstream file(filename, std::ios::ate | std::ios::binary);
+        const std::filesystem::path shaderPath = shaderDirectory_ / filename;
+        std::ifstream file(shaderPath, std::ios::ate | std::ios::binary);
         if (!file) {
-            throw std::runtime_error("Cannot open compiled shader: " + filename);
+            throw std::runtime_error("Cannot open compiled shader: " + shaderPath.string());
         }
         const auto end = file.tellg();
         const auto byteCount = static_cast<std::streamoff>(end);
         if (byteCount <= 0 || byteCount % static_cast<std::streamoff>(sizeof(std::uint32_t)) != 0) {
-            throw std::runtime_error("Compiled shader has an invalid SPIR-V size: " + filename);
+            throw std::runtime_error("Compiled shader has an invalid SPIR-V size: " + shaderPath.string());
         }
         const auto wordCount = static_cast<std::size_t>(byteCount) / sizeof(std::uint32_t);
         std::vector<std::uint32_t> code(wordCount);
         file.seekg(0);
         file.read(reinterpret_cast<char*>(code.data()), static_cast<std::streamsize>(byteCount));
         if (!file) {
-            throw std::runtime_error("Failed while reading compiled shader: " + filename);
+            throw std::runtime_error("Failed while reading compiled shader: " + shaderPath.string());
         }
         return code;
     }
@@ -511,11 +517,8 @@ private:
     }
 
     void create_graphics_pipeline() {
-#ifndef LIC_SHADER_DIR
-#define LIC_SHADER_DIR "shaders"
-#endif
-        const auto vertexCode = read_shader(std::string(LIC_SHADER_DIR) + "/viewport.vert.spv");
-        const auto fragmentCode = read_shader(std::string(LIC_SHADER_DIR) + "/viewport.frag.spv");
+        const auto vertexCode = read_shader("viewport.vert.spv");
+        const auto fragmentCode = read_shader("viewport.frag.spv");
         const VkShaderModule vertexModule = create_shader_module(vertexCode);
         VkShaderModule fragmentModule = VK_NULL_HANDLE;
         try {
@@ -860,8 +863,8 @@ private:
 
 } // namespace
 
-int run_vulkan_viewport() {
-    return VulkanViewport{}.run();
+int run_vulkan_viewport(const std::filesystem::path& executable_path) {
+    return VulkanViewport{executable_path}.run();
 }
 
 } // namespace lic::renderer
