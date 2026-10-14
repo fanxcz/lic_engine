@@ -74,6 +74,10 @@ jobs:
           if (-not (Test-Path "$package/vulkan-1.dll")) { throw "Missing packaged Vulkan loader." }
           Copy-Item "README.md" "$package/README.md"
           Copy-Item "docs/BUILDING.md" "$package/BUILDING.md"
+          New-Item -ItemType Directory -Force -Path "$package/assets", "$package/examples" | Out-Null
+          Copy-Item "assets/materials" "$package/assets/materials" -Recurse -Force
+          Copy-Item "assets/scripts" "$package/assets/scripts" -Recurse -Force
+          Copy-Item "examples/nexus" "$package/examples/nexus" -Recurse -Force
           Set-Content -Encoding ascii "$package/run-voidbound.bat" -Value @(
             "@echo off",
             "setlocal",
@@ -167,6 +171,9 @@ jobs:
           install -m 0644 build/runtime/runtime.cpp "$package/runtime/runtime.cpp"
           cp -R build/stdlib "$package/stdlib"
           cp build/NEXUS-LICENSE "$package/NEXUS-LICENSE"
+          mkdir -p "$package/assets" "$package/examples"
+          cp -R assets/materials assets/scripts "$package/assets/"
+          cp -R examples/nexus "$package/examples/"
           cat > "$package/run-lic-engine.sh" <<'EOF'
           #!/usr/bin/env sh
           set -eu
@@ -220,6 +227,9 @@ jobs:
           install -m 0644 build/runtime/runtime.cpp "$package/runtime/runtime.cpp"
           cp -R build/stdlib "$package/stdlib"
           cp build/NEXUS-LICENSE "$package/NEXUS-LICENSE"
+          mkdir -p "$package/assets" "$package/examples"
+          cp -R assets/materials assets/scripts "$package/assets/"
+          cp -R examples/nexus "$package/examples/"
           cp README.md "$package/README.md"
           cp docs/BUILDING.md "$package/BUILDING.md"
           cat > "$package/run-lic-engine.sh" <<'EOF'

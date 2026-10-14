@@ -141,6 +141,13 @@ Set-Content -Encoding ascii (Join-Path $packageDir "run-lic-engine.bat") -Value 
 )
 Copy-Item (Join-Path $repoRoot "README.md") (Join-Path $packageDir "README.md") -Force
 Copy-Item (Join-Path $repoRoot "docs/BUILDING.md") (Join-Path $packageDir "BUILDING.md") -Force
+$assetDir = Join-Path $packageDir "assets"
+New-Item -ItemType Directory -Force -Path $assetDir | Out-Null
+Copy-Item (Join-Path $repoRoot "assets/materials") (Join-Path $assetDir "materials") -Recurse -Force
+Copy-Item (Join-Path $repoRoot "assets/scripts") (Join-Path $assetDir "scripts") -Recurse -Force
+$examplesDir = Join-Path $packageDir "examples"
+New-Item -ItemType Directory -Force -Path $examplesDir | Out-Null
+Copy-Item (Join-Path $repoRoot "examples/nexus") (Join-Path $examplesDir "nexus") -Recurse -Force
 
 Write-Host ([Environment]::NewLine + "[4/4] Checking executable and packing ZIP...") -ForegroundColor Cyan
 & $executable --version
