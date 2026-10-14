@@ -172,7 +172,10 @@ if(LIC_ENGINE_ENABLE_VULKAN)
         target_include_directories(lic_imgui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
         target_link_libraries(lic_imgui PUBLIC Vulkan::Vulkan ${LIC_GLFW_TARGET})
 
-        add_library(lic_editor_ui engine/editor/src/editor_ui.cpp)
+        add_library(lic_editor_ui
+            engine/editor/src/editor_ui.cpp
+            engine/editor/src/nexus_panel.cpp
+            engine/editor/src/material_library.cpp)
         add_library(LIC::EditorUI ALIAS lic_editor_ui)
         target_include_directories(lic_editor_ui PUBLIC engine/editor/include)
         target_link_libraries(lic_editor_ui PUBLIC LIC::World LIC::Game LIC::ImGui LIC::Scripting lic_build_options)
