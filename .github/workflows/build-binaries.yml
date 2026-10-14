@@ -2,6 +2,8 @@ name: Build platform binaries
 
 on:
   push:
+    branches: [main]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
@@ -49,6 +51,13 @@ jobs:
           }
           Copy-Item "README.md" "$package/README.md"
           Copy-Item "docs/BUILDING.md" "$package/BUILDING.md"
+          @'
+          @echo off
+          cd /d "%~dp0"
+          lic_editor.exe %*
+          '@ | Set-Content -Encoding ascii "$package/run-lic-engine.bat"
+          & "$package/lic_editor.exe" --version
+          if ($LASTEXITCODE -ne 0) { throw "The packaged executable failed its version smoke test." }
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Compress-Archive -Path "$package/*" -DestinationPath "dist/lic-engine-windows-x64.zip" -Force
 
@@ -92,6 +101,14 @@ jobs:
           cp -R build/shaders "$package/shaders"
           cp README.md "$package/README.md"
           cp docs/BUILDING.md "$package/BUILDING.md"
+          cat > "$package/run-lic-engine.sh" <<'EOF'
+          #!/usr/bin/env sh
+          set -eu
+          cd "$(dirname "$0")"
+          exec ./lic_editor "$@"
+          EOF
+          chmod +x "$package/run-lic-engine.sh"
+          "$package/lic_editor" --version
           tar -C dist -czf dist/lic-engine-linux-x64.tar.gz lic-engine-linux-x64
 
       - uses: actions/upload-artifact@v4
@@ -103,7 +120,7 @@ jobs:
 
   macos-arm64-core:
     name: macOS / Apple Silicon / Core CLI
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
@@ -124,6 +141,14 @@ jobs:
           install -m 0755 build/lic_editor "$package/lic_editor"
           cp README.md "$package/README.md"
           cp docs/BUILDING.md "$package/BUILDING.md"
+          cat > "$package/run-lic-engine.sh" <<'EOF'
+          #!/usr/bin/env sh
+          set -eu
+          cd "$(dirname "$0")"
+          exec ./lic_editor "$@"
+          EOF
+          chmod +x "$package/run-lic-engine.sh"
+          "$package/lic_editor" --version
           tar -C dist -czf dist/lic-engine-macos-arm64-core.tar.gz lic-engine-macos-arm64-core
 
       - uses: actions/upload-artifact@v4
