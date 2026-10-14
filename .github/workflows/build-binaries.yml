@@ -1,0 +1,147 @@
+name: Build platform binaries
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-x64:
+    name: Windows 11 / x64 / Vulkan
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Vulkan SDK
+        uses: jakoch/install-vulkan-sdk-action@v1
+        with:
+          vulkan_version: 1.4.304.1
+          cache: true
+          stripdown: true
+          install_runtime: true
+
+      - name: Configure
+        run: cmake -S . -B build -A x64 -DLIC_ENGINE_ENABLE_VULKAN=ON -DLIC_ENGINE_FETCH_GLFW=ON -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Package Windows x64
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $package = "dist/lic-engine-windows-x64"
+          New-Item -ItemType Directory -Force -Path $package | Out-Null
+          Copy-Item "build/Release/lic_editor.exe" "$package/lic_editor.exe"
+          if (Test-Path "build/Release/shaders") {
+            Copy-Item "build/Release/shaders" "$package/shaders" -Recurse -Force
+          }
+          Copy-Item "README.md" "$package/README.md"
+          Copy-Item "docs/BUILDING.md" "$package/BUILDING.md"
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path "$package/*" -DestinationPath "dist/lic-engine-windows-x64.zip" -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lic-engine-windows-x64
+          path: dist/lic-engine-windows-x64.zip
+          if-no-files-found: error
+          retention-days: 30
+
+  linux-x64:
+    name: Linux / x64 / Vulkan
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Vulkan and window-system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config \
+            libvulkan-dev libglfw3-dev glslc mesa-vulkan-drivers \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLIC_ENGINE_ENABLE_VULKAN=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Package Linux x64
+        run: |
+          set -euo pipefail
+          package="dist/lic-engine-linux-x64"
+          mkdir -p "$package"
+          install -m 0755 build/lic_editor "$package/lic_editor"
+          if [ -d build/shaders ]; then cp -R build/shaders "$package/shaders"; fi
+          cp README.md "$package/README.md"
+          cp docs/BUILDING.md "$package/BUILDING.md"
+          tar -C dist -czf dist/lic-engine-linux-x64.tar.gz lic-engine-linux-x64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lic-engine-linux-x64
+          path: dist/lic-engine-linux-x64.tar.gz
+          if-no-files-found: error
+          retention-days: 30
+
+  macos-arm64-core:
+    name: macOS / Apple Silicon / Core CLI
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLIC_ENGINE_ENABLE_VULKAN=OFF
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Package macOS arm64 core executable
+        run: |
+          set -euo pipefail
+          package="dist/lic-engine-macos-arm64-core"
+          mkdir -p "$package"
+          install -m 0755 build/lic_editor "$package/lic_editor"
+          cp README.md "$package/README.md"
+          cp docs/BUILDING.md "$package/BUILDING.md"
+          tar -C dist -czf dist/lic-engine-macos-arm64-core.tar.gz lic-engine-macos-arm64-core
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lic-engine-macos-arm64-core
+          path: dist/lic-engine-macos-arm64-core.tar.gz
+          if-no-files-found: error
+          retention-days: 30
+
+  publish-release:
+    name: Attach binaries to GitHub Release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [windows-x64, linux-x64, macos-arm64-core]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: lic-engine-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish downloadable binaries
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          generate_release_notes: true
