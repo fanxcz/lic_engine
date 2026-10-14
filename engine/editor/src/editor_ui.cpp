@@ -1,4 +1,5 @@
 #include <lic/editor/editor_ui.hpp>
+#include <lic/scripting/process.hpp>
 
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_vulkan.h>
@@ -62,9 +63,20 @@ const char* node_icon(lic::world::NodeKind kind) {
 
 } // namespace
 
-EditorUi::EditorUi(bool start_in_game)
-    : project_root_(default_project_root()), scene_path_(project_root_ / "Scenes" / "Main.licscene"),
+EditorUi::EditorUi(bool start_in_game, std::filesystem::path executable_directory)
+    : project_root_(default_project_root()),
+      scene_path_(project_root_ / "Scenes" / "Main.licscene"),
+      script_path_(project_root_ / "Scripts" / "GameRules.nx"),
+      executable_directory_(std::move(executable_directory)),
       game_mode_(start_in_game), standalone_game_(start_in_game) {
+    if (executable_directory_.empty()) executable_directory_ = std::filesystem::current_path();
+#ifdef _WIN32
+    nexus_executable_ = executable_directory_ / "nexus.exe";
+    nexus_rules_binary_ = project_root_ / "Build" / "Nexus" / "GameRules.exe";
+#else
+    nexus_executable_ = executable_directory_ / "nexus";
+    nexus_rules_binary_ = project_root_ / "Build" / "Nexus" / "GameRules";
+#endif
     create_default_scene();
 }
 
@@ -118,6 +130,20 @@ void EditorUi::initialize_platform(GLFWwindow* window) {
     window_ = window;
     std::filesystem::create_directories(project_root_ / "Scenes");
     std::filesystem::create_directories(project_root_ / "Assets");
+    std::filesystem::create_directories(script_path_.parent_path());
+    std::filesystem::create_directories(nexus_rules_binary_.parent_path());
+    if (!std::filesystem::exists(script_path_)) {
+        std::ofstream sample(script_path_, std::ios::binary | std::ios::trunc);
+        sample << "fn main() {\n"
+                  "    // These values are read by LIC Engine when a run starts.\n"
+                  "    print(\\"LICCFG_PLAYER_HEALTH=100\\")\n"
+                  "    print(\\"LICCFG_PLAYER_SPEED=230\\")\n"
+                  "    print(\\"LICCFG_ENEMY_SPEED=68\\")\n"
+                  "    print(\\"LICCFG_FIRE_INTERVAL_MS=240\\")\n"
+                  "    print(\\"LICCFG_DASH_COOLDOWN_MS=1350\\")\n"
+                  "}\n";
+    }
+    load_nexus_script();
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -423,13 +449,16 @@ void EditorUi::build_frame(float delta_seconds) {
             input.move_z = static_cast<float>(glfwGetKey(window_, GLFW_KEY_S) == GLFW_PRESS) -
                            static_cast<float>(glfwGetKey(window_, GLFW_KEY_W) == GLFW_PRESS);
             input.dash_pressed = dashPressed;
-            input.fire_held = glfwGetMouseButton(window_, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS ||
+            const ImGuiIO& inputIo = ImGui::GetIO();
+            input.fire_held = (!inputIo.WantCaptureMouse &&
+                               glfwGetMouseButton(window_, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) ||
                               glfwGetKey(window_, GLFW_KEY_SPACE) == GLFW_PRESS;
             game_.update(delta_seconds_, input);
         }
 
-        draw_scene_canvas();
-        if (game_mode_) draw_game_ui();
+        // Do not create a fullscreen SceneCanvas window behind the game HUD.
+        // It could steal ImGui focus and make visible game buttons unclickable.
+        draw_game_ui();
         ImGui::Render();
         return;
     }
@@ -452,6 +481,7 @@ void EditorUi::build_frame(float delta_seconds) {
     draw_hierarchy();
     draw_inspector();
     draw_bottom_panel();
+    draw_nexus_panel();
     draw_new_scene_dialog();
     ImGui::Render();
 }
@@ -496,6 +526,11 @@ void EditorUi::draw_toolbar() {
     }
     ImGui::SameLine();
     if (ImGui::Button("Play Game  F7")) enter_game_mode(false);
+    ImGui::SameLine();
+    if (ImGui::Button("NEXUS Rules")) {
+        load_nexus_script();
+        show_nexus_panel_ = true;
+    }
     ImGui::SameLine();
     if (ImGui::Button("Reset Camera")) {
         camera_yaw_ = 0.68F;
@@ -669,7 +704,8 @@ void EditorUi::draw_bottom_panel() {
         if (ImGui::BeginTabItem("FileSystem")) {
             ImGui::TextDisabled("%s", project_root_.string().c_str());
             ImGui::BeginChild("##ProjectFiles", ImVec2(0.0F, 88.0F), false, ImGuiWindowFlags_HorizontalScrollbar);
-            const std::array<std::filesystem::path, 2> folders{project_root_ / "Scenes", project_root_ / "Assets"};
+            const std::array<std::filesystem::path, 3> folders{
+                project_root_ / "Scenes", project_root_ / "Assets", project_root_ / "Scripts"};
             for (const auto& folder : folders) {
                 ImGui::TextDisabled("%s/", folder.filename().string().c_str());
                 std::error_code error;
@@ -753,7 +789,7 @@ void EditorUi::draw_game_ui() {
     ImGui::SetNextWindowSize(display, ImGuiCond_Always);
     ImGui::SetNextWindowBgAlpha(0.0F);
     const auto flags = kFixedPanelFlags | ImGuiWindowFlags_NoBackground |
-                       ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBringToFrontOnFocus;
+                       ImGuiWindowFlags_NoScrollbar;
     if (!ImGui::Begin("##VoidboundOverlay", nullptr, flags)) {
         ImGui::End();
         return;
@@ -813,7 +849,7 @@ void EditorUi::draw_game_ui() {
             ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 83.0F));
             ImGui::TextWrapped("The rift is spreading. Survive the waves, collect memory shards and build a stronger loadout.");
             ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 145.0F));
-            if (ImGui::Button("START RUN", ImVec2(panelWidth - 64.0F, 38.0F))) game_.start_run();
+            if (ImGui::Button("START RUN", ImVec2(panelWidth - 64.0F, 38.0F))) start_game_run();
             ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 200.0F));
             ImGui::TextDisabled("WASD  move     SHIFT  dash");
             ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 222.0F));
@@ -843,7 +879,7 @@ void EditorUi::draw_game_ui() {
             ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 104.0F));
             if (ImGui::Button("RESUME", ImVec2(panelWidth - 64.0F, 36.0F))) game_.resume();
             ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 154.0F));
-            if (ImGui::Button("RESTART RUN", ImVec2(panelWidth - 64.0F, 36.0F))) game_.start_run();
+            if (ImGui::Button("RESTART RUN", ImVec2(panelWidth - 64.0F, 36.0F))) start_game_run();
             ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 204.0F));
             if (!standalone_game_ && ImGui::Button("BACK TO EDITOR", ImVec2(panelWidth - 64.0F, 36.0F))) exit_game_mode();
             if (standalone_game_) {
@@ -858,7 +894,7 @@ void EditorUi::draw_game_ui() {
                                        std::to_string(game_.kills());
             ImGui::TextWrapped("%s", summary.c_str());
             ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 145.0F));
-            if (ImGui::Button("TRY AGAIN", ImVec2(panelWidth - 64.0F, 36.0F))) game_.start_run();
+            if (ImGui::Button("TRY AGAIN", ImVec2(panelWidth - 64.0F, 36.0F))) start_game_run();
             ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 195.0F));
             if (ImGui::Button("MAIN MENU", ImVec2(panelWidth - 64.0F, 36.0F))) game_.show_menu();
             ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 245.0F));
@@ -869,6 +905,186 @@ void EditorUi::draw_game_ui() {
             }
         }
     }
+    ImGui::End();
+}
+
+namespace {
+
+std::string path_utf8(const std::filesystem::path& path) {
+    const auto encoded = path.u8string();
+    return {reinterpret_cast<const char*>(encoded.data()), encoded.size()};
+}
+
+bool parse_setting_value(const std::string& line, const char* name, int& value) {
+    const std::string prefix = std::string(name) + "=";
+    if (!line.starts_with(prefix)) return false;
+    try {
+        std::size_t parsed = 0;
+        const int candidate = std::stoi(line.substr(prefix.size()), &parsed);
+        if (parsed != line.size() - prefix.size()) return false;
+        value = candidate;
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+void parse_nexus_settings(const std::string& output, lic::game::ScriptSettings& settings) {
+    std::istringstream input(output);
+    std::string line;
+    while (std::getline(input, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        (void)(parse_setting_value(line, "LICCFG_PLAYER_HEALTH", settings.player_health) ||
+               parse_setting_value(line, "LICCFG_PLAYER_SPEED", settings.player_speed) ||
+               parse_setting_value(line, "LICCFG_ENEMY_SPEED", settings.enemy_speed) ||
+               parse_setting_value(line, "LICCFG_FIRE_INTERVAL_MS", settings.fire_interval_ms) ||
+               parse_setting_value(line, "LICCFG_DASH_COOLDOWN_MS", settings.dash_cooldown_ms));
+    }
+}
+
+} // namespace
+
+void EditorUi::load_nexus_script() {
+    nexus_script_buffer_.fill('\0');
+    std::ifstream input(script_path_, std::ios::binary);
+    if (!input) {
+        nexus_script_loaded_ = false;
+        nexus_status_ = "Cannot open " + script_path_.string();
+        return;
+    }
+    const std::string source{std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+    const std::size_t length = std::min(source.size(), nexus_script_buffer_.size() - 1U);
+    std::copy_n(source.data(), length, nexus_script_buffer_.data());
+    nexus_script_loaded_ = true;
+    nexus_status_ = "Loaded " + script_path_.filename().string();
+}
+
+void EditorUi::save_nexus_script() {
+    try {
+        std::filesystem::create_directories(script_path_.parent_path());
+        std::ofstream output(script_path_, std::ios::binary | std::ios::trunc);
+        if (!output) throw std::runtime_error("cannot write " + script_path_.string());
+        const auto end = std::find(nexus_script_buffer_.begin(), nexus_script_buffer_.end(), '\0');
+        output.write(nexus_script_buffer_.data(),
+                     static_cast<std::streamsize>(std::distance(nexus_script_buffer_.begin(), end)));
+        if (!output) throw std::runtime_error("write failed for " + script_path_.string());
+        nexus_script_loaded_ = true;
+        nexus_status_ = "Saved " + script_path_.filename().string();
+    } catch (const std::exception& error) {
+        nexus_status_ = std::string("Save failed: ") + error.what();
+        log(nexus_status_);
+    }
+}
+
+void EditorUi::execute_nexus_action(int action) {
+    save_nexus_script();
+    if (!std::filesystem::is_regular_file(nexus_executable_)) {
+        nexus_status_ = "NEXUS compiler not found beside the LIC Engine executable";
+        nexus_output_ = "Expected compiler: " + nexus_executable_.string() +
+            "\nDownload the complete editor ZIP; it includes nexus.exe and runtime/.";
+        log(nexus_status_);
+        return;
+    }
+
+    std::error_code error;
+    std::filesystem::create_directories(nexus_rules_binary_.parent_path(), error);
+    if (error) {
+        nexus_status_ = "Cannot create NEXUS build directory: " + error.message();
+        nexus_output_ = nexus_status_;
+        return;
+    }
+    const auto logFile = nexus_rules_binary_.parent_path() / "nexus-process.log";
+    const std::string scriptArgument = path_utf8(script_path_);
+    const std::string outputArgument = path_utf8(nexus_rules_binary_);
+
+    std::vector<std::string> command;
+    if (action == 0) {
+        command = {"check", scriptArgument};
+    } else {
+        command = {"build", scriptArgument, "-o", outputArgument, "--backend", "native"};
+    }
+
+    auto result = lic::scripting::run_process_capture(nexus_executable_, command, project_root_, logFile);
+    nexus_output_ = result.output;
+    if (!result.started || result.exit_code != 0) {
+        nexus_status_ = action == 0 ? "NEXUS check failed" : "NEXUS build failed";
+        if (nexus_output_.empty()) nexus_output_ = "NEXUS process failed to start or returned no diagnostics.";
+        log(nexus_status_);
+        return;
+    }
+    if (action == 0) {
+        nexus_status_ = "NEXUS syntax and semantic checks passed";
+        log(nexus_status_);
+        return;
+    }
+    if (action == 1) {
+        nexus_status_ = "Built " + nexus_rules_binary_.filename().string();
+        log(nexus_status_);
+        return;
+    }
+
+    const auto builtOutput = nexus_output_;
+    auto runResult = lic::scripting::run_process_capture(
+        nexus_rules_binary_, {}, project_root_, logFile);
+    nexus_output_ = builtOutput + "\n--- GameRules.nx output ---\n" + runResult.output;
+    if (!runResult.started || runResult.exit_code != 0) {
+        nexus_status_ = "NEXUS rules executable failed";
+        log(nexus_status_);
+        return;
+    }
+
+    lic::game::ScriptSettings settings{};
+    parse_nexus_settings(runResult.output, settings);
+    game_.apply_script_settings(settings);
+    nexus_status_ = "Rules loaded: HP " + std::to_string(settings.player_health) +
+        ", speed " + std::to_string(settings.player_speed) + "/100, enemy " +
+        std::to_string(settings.enemy_speed) + "/100";
+    log(nexus_status_);
+}
+
+void EditorUi::apply_nexus_game_rules() {
+    execute_nexus_action(2);
+}
+
+void EditorUi::start_game_run() {
+    apply_nexus_game_rules();
+    game_.start_run();
+    if (nexus_status_.find("Rules loaded:") == std::string::npos) {
+        log("Started with built-in game defaults because the NEXUS rules script did not load");
+    }
+}
+
+void EditorUi::draw_nexus_panel() {
+    if (!show_nexus_panel_) return;
+    ImGui::SetNextWindowSize(ImVec2(760.0F, 570.0F), ImGuiCond_FirstUseEver);
+    if (!ImGui::Begin("NEXUS Game Rules", &show_nexus_panel_)) {
+        ImGui::End();
+        return;
+    }
+    ImGui::TextDisabled("%s", script_path_.string().c_str());
+    ImGui::TextWrapped("This is real NEXUS source. The game compiles and runs it when a new run starts; "
+                       "print lines beginning with LICCFG_ configure Voidbound.");
+    ImGui::InputTextMultiline("##NEXUSGameRules", nexus_script_buffer_.data(),
+        nexus_script_buffer_.size(), ImVec2(-1.0F, 280.0F), ImGuiInputTextFlags_AllowTabInput);
+    if (ImGui::Button("Save")) save_nexus_script();
+    ImGui::SameLine();
+    if (ImGui::Button("Check")) execute_nexus_action(0);
+    ImGui::SameLine();
+    if (ImGui::Button("Build")) execute_nexus_action(1);
+    ImGui::SameLine();
+    if (ImGui::Button("Test Rules")) execute_nexus_action(2);
+    ImGui::SameLine();
+    if (ImGui::Button("Reload")) load_nexus_script();
+    ImGui::TextDisabled("%s", nexus_status_.c_str());
+    ImGui::Separator();
+    ImGui::BeginChild("##NexusOutput", ImVec2(0.0F, 116.0F), true,
+                      ImGuiWindowFlags_HorizontalScrollbar);
+    if (nexus_output_.empty()) {
+        ImGui::TextDisabled("NEXUS compiler output will appear here.");
+    } else {
+        ImGui::TextUnformatted(nexus_output_.c_str());
+    }
+    ImGui::EndChild();
     ImGui::End();
 }
 
