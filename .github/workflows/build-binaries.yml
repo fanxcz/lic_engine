@@ -41,7 +41,8 @@ jobs:
           foreach ($shader in @("viewport.vert.spv", "viewport.frag.spv")) {
             if (-not (Test-Path "build/Release/shaders/$shader")) { throw "Missing compiled Vulkan shader: $shader" }
           }
-          Copy-Item "build/Release/shaders" "$package/shaders" -Recurse -Force
+          New-Item -ItemType Directory -Force -Path "$package/shaders" | Out-Null
+          Copy-Item "build/Release/shaders/*" "$package/shaders" -Recurse -Force
           if ($env:VULKAN_SDK) {
             $loader = Join-Path $env:VULKAN_SDK "Runtime/x64/vulkan-1.dll"
             if (Test-Path $loader) { Copy-Item $loader "$package/vulkan-1.dll" -Force }
