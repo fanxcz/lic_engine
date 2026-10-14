@@ -26,7 +26,7 @@ A milestone is not complete because directories or placeholder classes exist. Ea
 
 ## M2 — World and saved scenes
 
-- [ ] Stable entity handles and core components.
+- [x] Stable entity handles and core components (initial generational ECS world and component storage are implemented).
 - [ ] Transform hierarchy and documented coordinate convention.
 - [ ] Scene save/load with versioned serialization.
 - [ ] Round-trip tests and malformed-file diagnostics.
