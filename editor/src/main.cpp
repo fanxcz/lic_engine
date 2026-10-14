@@ -1,6 +1,10 @@
 #include <lic/core/diagnostics.hpp>
 #include <lic/core/version.hpp>
 
+#ifdef LIC_HAS_VULKAN_VIEWPORT
+#include <lic/renderer/vulkan_viewport.hpp>
+#endif
+
 #include <iostream>
 #include <string_view>
 
@@ -12,9 +16,20 @@ int main(int argc, char** argv) {
             return 0;
         }
         if (argument == "--help" || argument == "-h") {
-            std::cout << "LIC Engine - initial foundation tools\n"
-                         "Usage: lic_editor [--help] [--version] [--diagnostics]\n";
+            std::cout << "LIC Engine - native game-engine foundation\n"
+                         "Usage: lic_editor [--help] [--version] [--diagnostics] [--window]\n"
+                         "  --diagnostics  Print build and platform information\n"
+                         "  --window       Open the native Vulkan viewport (when built with Vulkan + GLFW)\n";
             return 0;
+        }
+        if (argument == "--window") {
+#ifdef LIC_HAS_VULKAN_VIEWPORT
+            return lic::renderer::run_vulkan_viewport();
+#else
+            std::cerr << "This build has no Vulkan viewport. Install Vulkan development files and GLFW, "
+                         "then reconfigure with LIC_ENGINE_ENABLE_VULKAN=ON.\n";
+            return 3;
+#endif
         }
         if (argument != "--diagnostics") {
             std::cerr << "Unknown option: " << argument << "\nUse --help to see available options.\n";
