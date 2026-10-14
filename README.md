@@ -123,7 +123,7 @@ Folders should be introduced with their first real implementation rather than fi
 
 ## Build and validation
 
-Build instructions will be added alongside the first working CMake targets. Every milestone should include exact configure/build/test commands and report which commands were actually run. A successful documentation commit must never be presented as a working renderer or editor.
+Follow [docs/BUILDING.md](docs/BUILDING.md) for exact Windows 11, Linux, and CI artifact commands. CTest covers the core tests and CLI smoke tests. The platform workflow builds the Windows and Linux Vulkan viewport packages and a macOS core executable; it does not imply support for Android or Web yet. Report only builds and tests that were actually run, and distinguish the core CLI from the graphical renderer.
 
 ## Contributing
 
