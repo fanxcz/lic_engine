@@ -72,8 +72,8 @@ static_assert(sizeof(SceneObjectPushConstants) == 80);
 
 class VulkanViewport final {
 public:
-    explicit VulkanViewport(const std::filesystem::path& executablePath)
-        : shaderDirectory_(executablePath.parent_path() / "shaders") {}
+    explicit VulkanViewport(const std::filesystem::path& executablePath, bool startInGame)
+        : shaderDirectory_(executablePath.parent_path() / "shaders"), editor_ui_(startInGame) {}
 
     int run() {
         try {
@@ -168,8 +168,11 @@ private:
         glfwInitialized_ = true;
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+        const char* title = editor_ui_.standalone_game()
+            ? "VOIDBOUND | LIC Engine"
+            : "LIC Engine | Scene Editor";
         window_ = glfwCreateWindow(static_cast<int>(kWindowWidth), static_cast<int>(kWindowHeight),
-                                   "LIC Engine | Vulkan Viewport", nullptr, nullptr);
+                                   title, nullptr, nullptr);
         if (window_ == nullptr) {
             throw std::runtime_error("Could not create a window. Check the desktop session and graphics drivers.");
         }
@@ -711,7 +714,11 @@ private:
         check(vkBeginCommandBuffer(commandBuffer, &beginInfo), "vkBeginCommandBuffer");
 
         std::array<VkClearValue, 2> clear{};
-        clear[0].color = {{0.075F, 0.090F, 0.115F, 1.0F}};
+        if (editor_ui_.game_mode()) {
+            clear[0].color = {{0.018F, 0.029F, 0.047F, 1.0F}};
+        } else {
+            clear[0].color = {{0.075F, 0.090F, 0.115F, 1.0F}};
+        }
         clear[1].depthStencil = {1.0F, 0};
         VkRenderPassBeginInfo renderInfo{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
         renderInfo.renderPass = renderPass_;
@@ -750,7 +757,7 @@ private:
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
 
-        const auto& world = editor_ui_.world();
+        const auto& world = editor_ui_.render_world();
         world.each<lic::world::NodeName>([&](lic::world::Entity entity, const lic::world::NodeName&) {
             if (!world.has<lic::world::Transform>(entity) ||
                 !world.has<lic::world::NodeKindComponent>(entity) ||
@@ -1001,8 +1008,8 @@ private:
 
 } // namespace
 
-int run_vulkan_viewport(const std::filesystem::path& executable_path) {
-    return VulkanViewport{executable_path}.run();
+int run_vulkan_viewport(const std::filesystem::path& executable_path, bool start_in_game) {
+    return VulkanViewport{executable_path, start_in_game}.run();
 }
 
 } // namespace lic::renderer

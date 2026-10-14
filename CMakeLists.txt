@@ -41,6 +41,11 @@ add_library(LIC::World ALIAS lic_world)
 target_include_directories(lic_world INTERFACE engine/world/include)
 target_link_libraries(lic_world INTERFACE lic_build_options)
 
+add_library(lic_game engine/game/src/voidbound.cpp)
+add_library(LIC::Game ALIAS lic_game)
+target_include_directories(lic_game PUBLIC engine/game/include)
+target_link_libraries(lic_game PUBLIC LIC::World lic_build_options)
+
 add_executable(lic_editor editor/src/main.cpp)
 target_link_libraries(lic_editor PRIVATE LIC::Core lic_build_options)
 if(WIN32)
@@ -144,6 +149,17 @@ if(LIC_ENGINE_ENABLE_VULKAN)
         target_link_libraries(lic_renderer PUBLIC lic_build_options)
         target_compile_definitions(lic_editor PRIVATE LIC_HAS_VULKAN_VIEWPORT=1)
         target_link_libraries(lic_editor PRIVATE LIC::Renderer)
+
+        add_executable(voidbound editor/src/main.cpp)
+        target_compile_definitions(voidbound PRIVATE LIC_HAS_VULKAN_VIEWPORT=1 LIC_START_IN_GAME=1)
+        target_link_libraries(voidbound PRIVATE LIC::Core LIC::Renderer lic_build_options)
+        add_custom_command(TARGET voidbound POST_BUILD
+            COMMAND "${CMAKE_COMMAND}" -E copy_directory
+                    "${LIC_SHADER_OUTPUT_DIR}" "$<TARGET_FILE_DIR:voidbound>/shaders"
+            VERBATIM
+            COMMENT "Copy Voidbound shaders beside the game executable"
+        )
+
         add_custom_command(TARGET lic_editor POST_BUILD
             COMMAND "${CMAKE_COMMAND}" -E copy_directory
                     "${LIC_SHADER_OUTPUT_DIR}" "$<TARGET_FILE_DIR:lic_editor>/shaders"
@@ -160,7 +176,7 @@ endif()
 
 if(BUILD_TESTING AND LIC_ENGINE_BUILD_TESTS)
     add_executable(lic_core_tests tests/core_tests.cpp)
-    target_link_libraries(lic_core_tests PRIVATE LIC::Core LIC::World lic_build_options)
+    target_link_libraries(lic_core_tests PRIVATE LIC::Core LIC::World LIC::Game lic_build_options)
     add_test(NAME lic_core_tests COMMAND lic_core_tests)
     add_test(NAME lic_editor_help COMMAND lic_editor --help)
     add_test(NAME lic_editor_version COMMAND lic_editor --version)

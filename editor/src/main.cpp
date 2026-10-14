@@ -28,14 +28,16 @@ int main(int argc, char** argv) {
         }
         if (argument == "--help" || argument == "-h") {
             std::cout << "LIC Engine - native game-engine foundation\n"
-                         "Usage: lic_editor [--help] [--version] [--diagnostics] [--window]\n"
+                         "Usage: lic_editor [--help] [--version] [--diagnostics] [--window] [--game]\n"
                          "  --diagnostics  Print build and platform information\n"
-                         "  --window       Open the native Vulkan viewport (when built with Vulkan + GLFW)\n";
+                         "  --window       Open the scene editor\n"
+                         "  --game         Start the Voidbound survival game\n";
             return 0;
         }
-        if (argument == "--window") {
+        if (argument == "--window" || argument == "--game") {
 #ifdef LIC_HAS_VULKAN_VIEWPORT
-            return lic::renderer::run_vulkan_viewport(std::filesystem::absolute(std::filesystem::path(argv[0])));
+            return lic::renderer::run_vulkan_viewport(
+                std::filesystem::absolute(std::filesystem::path(argv[0])), argument == "--game");
 #else
             std::cerr << "This build has no Vulkan viewport. Install Vulkan development files, GLFW 3, and glslc, "
                          "then reconfigure with LIC_ENGINE_ENABLE_VULKAN=ON.\n";
@@ -51,7 +53,11 @@ int main(int argc, char** argv) {
 #ifdef LIC_HAS_VULKAN_VIEWPORT
     // Launch the graphical viewport only when the executable is opened without CLI arguments.
     if (argc == 1) {
-        return lic::renderer::run_vulkan_viewport(std::filesystem::absolute(std::filesystem::path(argv[0])));
+#ifdef LIC_START_IN_GAME
+        return lic::renderer::run_vulkan_viewport(std::filesystem::absolute(std::filesystem::path(argv[0])), true);
+#else
+        return lic::renderer::run_vulkan_viewport(std::filesystem::absolute(std::filesystem::path(argv[0])), false);
+#endif
     }
 #else
 #ifdef _WIN32
