@@ -37,11 +37,22 @@ struct UpgradeOption final {
     std::string_view description;
 };
 
+// Values are emitted by a NEXUS GameRules.nx script.
+struct ScriptSettings final {
+    int player_health{100};
+    int player_speed{230};          // hundredths of game units per second
+    int enemy_speed{68};            // hundredths of game units per second
+    int fire_interval_ms{240};
+    int dash_cooldown_ms{1350};
+};
+
 class Voidbound final {
 public:
     Voidbound();
 
     void show_menu();
+    void apply_script_settings(const ScriptSettings& settings) noexcept;
+    [[nodiscard]] ScriptSettings script_settings() const noexcept { return settings_; }
     void start_run();
     void update(float delta_seconds, const Input& input);
     void pause();
@@ -67,6 +78,7 @@ public:
 
 private:
     lic::world::World world_;
+    ScriptSettings settings_{};
     lic::world::Entity player_{};
     RunState state_{RunState::Menu};
     std::array<UpgradeOption, 3> upgrade_options_{};
@@ -87,6 +99,7 @@ private:
     float fire_cooldown_{};
     float spawn_cooldown_{};
     float dash_cooldown_{};
+    float dash_cooldown_duration_{1.35F};
     float invulnerability_time_{};
     float dash_time_{};
 

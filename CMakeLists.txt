@@ -7,6 +7,7 @@ option(LIC_ENGINE_BUILD_TESTS "Build LIC Engine tests" ON)
 option(LIC_ENGINE_WARNINGS_AS_ERRORS "Treat project warnings as errors" OFF)
 option(LIC_ENGINE_ENABLE_VULKAN "Build the native Vulkan viewport when Vulkan and glslc are available" ON)
 option(LIC_ENGINE_FETCH_GLFW "Fetch GLFW 3.4 if it is not installed and the Vulkan backend can be built" OFF)
+option(LIC_ENGINE_ENABLE_NEXUS "Build the NEXUS language compiler for LIC Engine scripting" ON)
 
 # Use the static MSVC runtime so the Windows archive does not depend on a
 # separately installed Visual C++ redistributable.
@@ -45,6 +46,70 @@ add_library(lic_game engine/game/src/voidbound.cpp)
 add_library(LIC::Game ALIAS lic_game)
 target_include_directories(lic_game PUBLIC engine/game/include)
 target_link_libraries(lic_game PUBLIC LIC::World lic_build_options)
+
+add_library(lic_scripting engine/scripting/src/process.cpp)
+add_library(LIC::Scripting ALIAS lic_scripting)
+target_include_directories(lic_scripting PUBLIC engine/scripting/include)
+target_link_libraries(lic_scripting PUBLIC lic_build_options)
+
+if(LIC_ENGINE_ENABLE_NEXUS)
+    include(FetchContent)
+    FetchContent_Declare(
+        lic_nexus_source
+        GIT_REPOSITORY https://github.com/fanxcz/nexus-lang.git
+        GIT_TAG 7cfe12b451883497323d5021309e2ff57bcd202d
+        GIT_SHALLOW FALSE
+    )
+    FetchContent_GetProperties(lic_nexus_source)
+    if(NOT lic_nexus_source_POPULATED)
+        FetchContent_Populate(lic_nexus_source)
+    endif()
+
+    add_executable(lic_nexus
+        ${lic_nexus_source_SOURCE_DIR}/src/cli/main.cpp
+        ${lic_nexus_source_SOURCE_DIR}/src/compiler/format/formatter.cpp
+        ${lic_nexus_source_SOURCE_DIR}/src/compiler/frontend/lexer/lexer.cpp
+        ${lic_nexus_source_SOURCE_DIR}/src/compiler/frontend/parser/parser.cpp
+        ${lic_nexus_source_SOURCE_DIR}/src/compiler/semantic/semantic.cpp
+        ${lic_nexus_source_SOURCE_DIR}/src/compiler/backend/codegen/llvm_ir.cpp
+        ${lic_nexus_source_SOURCE_DIR}/src/compiler/backend/native/native.cpp
+        ${lic_nexus_source_SOURCE_DIR}/src/compiler/backend/native/target.cpp
+        ${lic_nexus_source_SOURCE_DIR}/src/compiler/backend/native/pe_elf.cpp
+        ${lic_nexus_source_SOURCE_DIR}/src/compiler/driver/driver.cpp
+    )
+    set_target_properties(lic_nexus PROPERTIES OUTPUT_NAME nexus)
+    target_include_directories(lic_nexus PRIVATE
+        ${lic_nexus_source_SOURCE_DIR}/src/compiler
+        ${lic_nexus_source_SOURCE_DIR}/src/compiler/frontend
+        ${lic_nexus_source_SOURCE_DIR}/src/compiler/backend
+    )
+    target_compile_features(lic_nexus PRIVATE cxx_std_20)
+    target_compile_definitions(lic_nexus PRIVATE
+        NEXUS_SOURCE_ROOT="${lic_nexus_source_SOURCE_DIR}"
+        NEXUS_VERSION="1.1.0"
+    )
+    if(MSVC)
+        target_compile_options(lic_nexus PRIVATE /W4 /permissive- /utf-8)
+        set_property(TARGET lic_nexus PROPERTY
+            MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    else()
+        target_compile_options(lic_nexus PRIVATE
+            -Wall -Wextra -Wpedantic -Wconversion
+            -Wno-misleading-indentation -Wno-shadow -Wno-unused-parameter)
+    endif()
+    add_custom_command(TARGET lic_nexus POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:lic_nexus>/runtime"
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "${lic_nexus_source_SOURCE_DIR}/src/runtime/runtime.cpp"
+            "$<TARGET_FILE_DIR:lic_nexus>/runtime/runtime.cpp"
+        COMMAND "${CMAKE_COMMAND}" -E copy_directory
+            "${lic_nexus_source_SOURCE_DIR}/stdlib" "$<TARGET_FILE_DIR:lic_nexus>/stdlib"
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "${lic_nexus_source_SOURCE_DIR}/LICENSE" "$<TARGET_FILE_DIR:lic_nexus>/NEXUS-LICENSE"
+        VERBATIM
+        COMMENT "Bundle NEXUS runtime and standard library"
+    )
+endif()
 
 add_executable(lic_editor editor/src/main.cpp)
 target_link_libraries(lic_editor PRIVATE LIC::Core lic_build_options)
@@ -110,7 +175,10 @@ if(LIC_ENGINE_ENABLE_VULKAN)
         add_library(lic_editor_ui engine/editor/src/editor_ui.cpp)
         add_library(LIC::EditorUI ALIAS lic_editor_ui)
         target_include_directories(lic_editor_ui PUBLIC engine/editor/include)
-        target_link_libraries(lic_editor_ui PUBLIC LIC::World LIC::Game LIC::ImGui lic_build_options)
+        target_link_libraries(lic_editor_ui PUBLIC LIC::World LIC::Game LIC::ImGui LIC::Scripting lic_build_options)
+        if(TARGET lic_nexus)
+            target_compile_definitions(lic_editor_ui PRIVATE LIC_ENGINE_HAS_NEXUS=1)
+        endif()
 
         set(LIC_SHADER_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/renderer_shaders")
         set(LIC_VERTEX_SPIRV "${LIC_SHADER_OUTPUT_DIR}/viewport.vert.spv")
@@ -174,6 +242,10 @@ else()
 endif()
 
 if(BUILD_TESTING AND LIC_ENGINE_BUILD_TESTS)
+    if(TARGET lic_nexus)
+        add_test(NAME lic_nexus_version COMMAND lic_nexus --version)
+        set_tests_properties(lic_nexus_version PROPERTIES PASS_REGULAR_EXPRESSION "Nexus 1.1.0")
+    endif()
     add_executable(lic_core_tests tests/core_tests.cpp)
     target_link_libraries(lic_core_tests PRIVATE LIC::Core LIC::World LIC::Game lic_build_options)
     add_test(NAME lic_core_tests COMMAND lic_core_tests)

@@ -2,6 +2,8 @@
 
 #include <lic/game/voidbound.hpp>
 #include <lic/world/scene.hpp>
+
+#include <array>
 #include <vulkan/vulkan.h>
 
 #include <cstdint>
@@ -22,7 +24,7 @@ struct ViewportRect final {
 
 class EditorUi final {
 public:
-    explicit EditorUi(bool start_in_game = false);
+    explicit EditorUi(bool start_in_game = false, std::filesystem::path executable_directory = {});
     ~EditorUi();
 
     EditorUi(const EditorUi&) = delete;
@@ -55,11 +57,18 @@ public:
 private:
     std::filesystem::path project_root_;
     std::filesystem::path scene_path_;
+    std::filesystem::path script_path_;
+    std::filesystem::path executable_directory_;
+    std::filesystem::path nexus_executable_;
+    std::filesystem::path nexus_rules_binary_;
     lic::world::World world_;
     lic::game::Voidbound game_;
     lic::world::Entity selected_entity_{};
     ViewportRect viewport_rect_{};
     std::vector<std::string> console_messages_;
+    std::array<char, 32768> nexus_script_buffer_{};
+    std::string nexus_output_;
+    std::string nexus_status_{"NEXUS rules not loaded"};
     GLFWwindow* window_{};
     bool imgui_context_initialized_{};
     bool imgui_glfw_initialized_{};
@@ -72,6 +81,8 @@ private:
     bool standalone_game_{};
     bool game_escape_was_down_{};
     bool game_dash_was_down_{};
+    bool nexus_script_loaded_{};
+    bool show_nexus_panel_{};
     float camera_yaw_{0.68F};
     float camera_pitch_{0.38F};
     float camera_zoom_{1.0F};
@@ -91,6 +102,12 @@ private:
     void duplicate_selected();
     void delete_selected();
     void toggle_play();
+    void load_nexus_script();
+    void save_nexus_script();
+    void execute_nexus_action(int action);
+    void apply_nexus_game_rules();
+    void start_game_run();
+    void draw_nexus_panel();
     void enter_game_mode(bool standalone = false);
     void exit_game_mode();
     void draw_game_ui();

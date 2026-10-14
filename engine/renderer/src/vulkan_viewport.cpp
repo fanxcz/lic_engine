@@ -73,7 +73,8 @@ static_assert(sizeof(SceneObjectPushConstants) == 80);
 class VulkanViewport final {
 public:
     explicit VulkanViewport(const std::filesystem::path& executablePath, bool startInGame)
-        : shaderDirectory_(executablePath.parent_path() / "shaders"), editor_ui_(startInGame) {}
+        : shaderDirectory_(executablePath.parent_path() / "shaders"),
+          editor_ui_(startInGame, executablePath.parent_path()) {}
 
     int run() {
         try {

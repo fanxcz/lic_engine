@@ -49,6 +49,14 @@ void Voidbound::show_menu() {
     pending_wave_advance_ = false;
 }
 
+void Voidbound::apply_script_settings(const ScriptSettings& settings) noexcept {
+    settings_.player_health = std::clamp(settings.player_health, 25, 500);
+    settings_.player_speed = std::clamp(settings.player_speed, 80, 600);
+    settings_.enemy_speed = std::clamp(settings.enemy_speed, 20, 250);
+    settings_.fire_interval_ms = std::clamp(settings.fire_interval_ms, 80, 2000);
+    settings_.dash_cooldown_ms = std::clamp(settings.dash_cooldown_ms, 250, 5000);
+}
+
 void Voidbound::start_run() {
     world_ = lic::world::World{};
     state_ = RunState::Playing;
@@ -60,14 +68,15 @@ void Voidbound::start_run() {
     experience_to_next_ = 5;
     pending_upgrades_ = 0;
     pending_wave_advance_ = false;
-    health_ = 100.0F;
-    max_health_ = 100.0F;
-    move_speed_ = 2.3F;
+    health_ = static_cast<float>(settings_.player_health);
+    max_health_ = health_;
+    move_speed_ = static_cast<float>(settings_.player_speed) / 100.0F;
     damage_ = 1.0F;
-    fire_interval_ = 0.24F;
+    fire_interval_ = static_cast<float>(settings_.fire_interval_ms) / 1000.0F;
     fire_cooldown_ = 0.0F;
     spawn_cooldown_ = 0.35F;
     dash_cooldown_ = 0.0F;
+    dash_cooldown_duration_ = static_cast<float>(settings_.dash_cooldown_ms) / 1000.0F;
     invulnerability_time_ = 0.0F;
     dash_time_ = 0.0F;
 
@@ -152,7 +161,9 @@ void Voidbound::spawn_enemy() {
     GameActor stats;
     stats.health = (elite ? 4.0F : 2.0F) + static_cast<float>(wave_) * 0.20F;
     stats.max_health = stats.health;
-    stats.speed = (elite ? 0.55F : 0.68F) + std::min(static_cast<float>(wave_) * 0.025F, 0.42F);
+    const float scriptedSpeed = static_cast<float>(settings_.enemy_speed) / 100.0F;
+    stats.speed = (elite ? scriptedSpeed * 0.82F : scriptedSpeed) +
+                  std::min(static_cast<float>(wave_) * 0.025F, 0.42F);
     stats.cooldown = 0.2F;
     stats.reward = elite ? 3 : 1;
     (void)spawn_actor((elite ? "Rift Brute " : "Rift Stalker ") + std::to_string(kills_ + spawnIndex + 1),
@@ -326,7 +337,7 @@ void Voidbound::update(float delta_seconds, const Input& input) {
                 playerTransform.position[2] += (dz / length) * 1.0F;
             }
         }
-        dash_cooldown_ = 1.35F;
+        dash_cooldown_ = dash_cooldown_duration_;
         dash_time_ = 0.18F;
         invulnerability_time_ = 0.34F;
     }
