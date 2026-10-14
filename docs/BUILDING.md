@@ -3,20 +3,20 @@
 LIC Engine can be built in two modes:
 
 - **Core mode** builds the engine core, command-line editor entry point, and tests. It does not require a graphics SDK.
-- **Vulkan viewport mode** additionally builds the GLFW window and Vulkan presentation backend. The current viewport is an initialization/presentation milestone: it clears the swapchain image to the editor background color. It does not render meshes yet.
+- **Vulkan viewport mode** additionally builds the GLFW window, Vulkan presentation backend, depth buffer, and a minimal shader pipeline that renders a colored test cube. This proves the first geometry draw path; it is not yet a general-purpose mesh/material renderer.
 
 ## Requirements
 
 - CMake 3.25 or newer
 - A C++23 compiler (MSVC 2022, GCC 13+, or Clang 16+ recommended)
-- For the viewport: Vulkan SDK or system Vulkan development headers/loader, plus GLFW 3 development files
+- For the viewport: Vulkan SDK or system Vulkan development headers/loader, GLFW 3 development files, and the `glslc` shader compiler
 - A desktop session and Vulkan-capable driver to run the viewport
 
 ### Debian / Ubuntu
 
 ```sh
 sudo apt-get update
-sudo apt-get install -y build-essential cmake ninja-build libvulkan-dev libglfw3-dev mesa-vulkan-drivers
+sudo apt-get install -y build-essential cmake ninja-build libvulkan-dev libglfw3-dev glslc mesa-vulkan-drivers
 ```
 
 For proprietary GPU drivers, install and configure the driver supported by the machine. Mesa's software Vulkan driver is useful for CI and compatible systems, but may not be installed/configured on every distribution.
@@ -54,6 +54,6 @@ If the graphics dependencies were not found during configuration, `--window` rep
 
 ## Known limitations of this milestone
 
-- No mesh, grid, camera controls, depth buffer, shader/material pipeline, or editor panels yet.
+- No asset-import pipeline, user-controlled camera, scene grid, general-purpose material system, or editor panels yet. The current cube is compiled directly into a small test shader.
 - Window resizing rebuilds swapchain-dependent resources; handling is intentionally kept small and will receive dedicated tests as the renderer grows.
 - Vulkan initialization is currently a runtime smoke-test. Headless CI builds and unit tests do not open a graphical window.
