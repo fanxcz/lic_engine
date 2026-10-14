@@ -160,7 +160,7 @@ jobs:
 
   publish-release:
     name: Attach binaries to GitHub Release
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
     needs: [windows-x64, linux-x64, macos-arm64-core]
     runs-on: ubuntu-latest
     permissions:
