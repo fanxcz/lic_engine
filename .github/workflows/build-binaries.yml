@@ -160,14 +160,14 @@ jobs:
 
   publish-release:
     name: Attach binaries to GitHub Release
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')))
     needs: [windows-x64, linux-x64, macos-arm64-core]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Update rolling download tag for manual builds
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
         uses: actions/github-script@v7
         with:
           script: |
@@ -198,8 +198,8 @@ jobs:
       - name: Publish downloadable binaries
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && 'continuous' || github.ref_name }}
-          prerelease: ${{ github.event_name == 'workflow_dispatch' }}
+          tag_name: ${{ (github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main') && 'continuous' || github.ref_name }}
+          prerelease: ${{ github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' }}
           make_latest: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
           files: |
             release-assets/lic_editor.exe
