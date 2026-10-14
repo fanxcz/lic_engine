@@ -156,12 +156,8 @@ if(LIC_ENGINE_ENABLE_VULKAN)
         add_executable(voidbound editor/src/main.cpp)
         target_compile_definitions(voidbound PRIVATE LIC_HAS_VULKAN_VIEWPORT=1 LIC_START_IN_GAME=1)
         target_link_libraries(voidbound PRIVATE LIC::Core LIC::Renderer lic_build_options)
-        add_custom_command(TARGET voidbound POST_BUILD
-            COMMAND "${CMAKE_COMMAND}" -E copy_directory
-                    "${LIC_SHADER_OUTPUT_DIR}" "$<TARGET_FILE_DIR:voidbound>/shaders"
-            VERBATIM
-            COMMENT "Copy Voidbound shaders beside the game executable"
-        )
+        # Share the shader folder copied by lic_editor's post-build step; avoid racing two copies.
+        add_dependencies(voidbound lic_editor)
 
         add_custom_command(TARGET lic_editor POST_BUILD
             COMMAND "${CMAKE_COMMAND}" -E copy_directory

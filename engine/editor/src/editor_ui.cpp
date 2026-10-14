@@ -853,9 +853,10 @@ void EditorUi::draw_game_ui() {
         } else if (state == lic::game::RunState::GameOver) {
             ImGui::TextUnformatted("SIGNAL LOST");
             ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 95.0F));
-            ImGui::TextWrapped(("Wave " + std::to_string(game_.wave()) + "   |   Score " +
-                                std::to_string(game_.score()) + "   |   Kills " +
-                                std::to_string(game_.kills())).c_str());
+            const std::string summary = "Wave " + std::to_string(game_.wave()) + "   |   Score " +
+                                       std::to_string(game_.score()) + "   |   Kills " +
+                                       std::to_string(game_.kills());
+            ImGui::TextWrapped("%s", summary.c_str());
             ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 145.0F));
             if (ImGui::Button("TRY AGAIN", ImVec2(panelWidth - 64.0F, 36.0F))) game_.start_run();
             ImGui::SetCursorScreenPos(ImVec2(panelMin.x + 32.0F, panelMin.y + 195.0F));
