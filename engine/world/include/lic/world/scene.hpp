@@ -143,7 +143,10 @@ struct MeshResourceReference final {
 };
 
 [[nodiscard]] inline bool is_safe_mesh_reference(std::string_view value) {
-    if (value.empty() || value.size() > 1024) return false;
+    if (value.empty() || value.size() > 1024 ||
+        value.front() == '/' || value.front() == '\\' ||
+        value.find('\\\\') != std::string_view::npos ||
+        value.find(':') != std::string_view::npos) return false;
     const std::filesystem::path path{std::string(value)};
     if (path.is_absolute() || path.has_root_name() || path.has_root_directory()) return false;
     for (const auto& component : path) if (component == "..") return false;
