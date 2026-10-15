@@ -1,0 +1,51 @@
+// Persistent NEXUS runtime demo for LIC Engine.
+// The host sends event codes and integer input values over stdin, one per line.
+// A frame response must end with LICFRAME_END. Event 0 exits; event 1 is an update.
+fn lic_spawn_box(id: i64, x: i64, y: i64, z: i64, scale: i64, r: i64, g: i64, b: i64) {
+    print("LICAPI SPAWN_BOX " + str_i64(id) + " " + str_i64(x) + " " + str_i64(y) + " " + str_i64(z) + " " + str_i64(scale) + " " + str_i64(r) + " " + str_i64(g) + " " + str_i64(b))
+}
+fn lic_move_by(id: i64, x: i64, y: i64, z: i64) {
+    print("LICAPI MOVE_BY " + str_i64(id) + " " + str_i64(x) + " " + str_i64(y) + " " + str_i64(z))
+}
+fn lic_set_color(id: i64, r: i64, g: i64, b: i64) {
+    print("LICAPI SET_COLOR " + str_i64(id) + " " + str_i64(r) + " " + str_i64(g) + " " + str_i64(b))
+}
+fn lic_set_surface(id: i64, metallic: i64, roughness: i64, emission: i64) {
+    print("LICAPI SET_SURFACE " + str_i64(id) + " " + str_i64(metallic) + " " + str_i64(roughness) + " " + str_i64(emission))
+}
+fn on_start() {
+    lic_spawn_box(900, 0, 0, 0, 100, 80, 720, 1000)
+    lic_set_surface(900, 350, 260, 250)
+}
+fn on_update(delta_ms: i64, move_x: i64, move_z: i64, dash: i64, fire: i64) {
+    lic_move_by(900, move_x * delta_ms / 1000, 0, move_z * delta_ms / 1000)
+    if dash == 1 {
+        lic_set_color(900, 1000, 880, 260)
+    } else if fire == 1 {
+        lic_set_surface(900, 300, 180, 1800)
+    } else {
+        lic_set_surface(900, 350, 260, 250)
+    }
+}
+fn main() {
+    on_start()
+    print("LICFRAME_END")
+    let mut running: i64 = 1
+    while running == 1 {
+        let event = input_i64("")
+        if event == 0 {
+            print("LICFRAME_END")
+            running = 0
+        } else if event == 1 {
+            let delta_ms = input_i64("")
+            let move_x = input_i64("")
+            let move_z = input_i64("")
+            let dash = input_i64("")
+            let fire = input_i64("")
+            on_update(delta_ms, move_x, move_z, dash, fire)
+            print("LICFRAME_END")
+        } else {
+            print("LICFRAME_END")
+        }
+    }
+}
