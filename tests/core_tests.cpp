@@ -1,6 +1,7 @@
 #include <lic/assets/gltf.hpp>
 #include <lic/core/version.hpp>
 #include <lic/game/voidbound.hpp>
+#include <lic/scripting/scene_api.hpp>
 #include <lic/world/scene.hpp>
 
 #include <array>
@@ -342,6 +343,49 @@ void test_gltf_import() {
     std::filesystem::remove_all(folder, ignored);
 }
 
+void test_nexus_scene_api() {
+    lic::world::World world;
+    const std::string output =
+        "LICCFG_PLAYER_HEALTH=100\n"
+        "LICAPI SPAWN_BOX 41 100 50 -200 100 1000 500 0\n"
+        "LICAPI SET_POSITION 41 200 50 0\n"
+        "LICAPI SET_ROTATION 41 0 90 0\n"
+        "LICAPI SET_SCALE 41 100 200 300\n"
+        "LICAPI SET_COLOR 41 100 200 300\n"
+        "LICAPI SET_SURFACE 41 500 600 1200\n"
+        "LICAPI SET_ENABLED 41 0\n"
+        "LICAPI SET_POSITION 41 0 0 0; rm -rf /\n";
+    const auto result = lic::scripting::apply_scene_commands(output, world);
+    expect(result.commands_applied == 7, "NEXUS API should apply safe entity setup and mutation commands");
+    expect(result.commands_ignored == 1, "NEXUS API should reject malformed commands");
+
+    lic::world::Entity entity{};
+    world.each<lic::world::NodeName>([&](lic::world::Entity candidate, const lic::world::NodeName& name) {
+        if (name.value == "NEXUS_41") entity = candidate;
+    });
+    expect(world.alive(entity), "NEXUS SPAWN_BOX should create an ECS mesh node");
+    const auto& transform = world.get<lic::world::Transform>(entity);
+    expect(transform.position[0] == 2.0F && transform.position[1] == 0.5F,
+           "NEXUS SET_POSITION should modify the ECS transform");
+    expect(transform.rotation_degrees[1] == 90.0F, "NEXUS SET_ROTATION should set Euler rotation");
+    expect(transform.scale[1] == 2.0F && transform.scale[2] == 3.0F,
+           "NEXUS SET_SCALE should modify scale");
+    const auto& appearance = world.get<lic::world::Appearance>(entity);
+    expect(std::abs(appearance.color[0] - 0.1F) < 0.0001F &&
+           std::abs(appearance.color[2] - 0.3F) < 0.0001F,
+           "NEXUS SET_COLOR should modify the base color");
+    expect(std::abs(appearance.metallic - 0.5F) < 0.0001F &&
+           std::abs(appearance.roughness - 0.6F) < 0.0001F &&
+           std::abs(appearance.emission_strength - 1.2F) < 0.0001F,
+           "NEXUS SET_SURFACE should modify material properties");
+    expect(!world.get<lic::world::NodeEnabled>(entity).value,
+           "NEXUS SET_ENABLED should change the entity's enabled state");
+
+    const auto destroy = lic::scripting::apply_scene_commands("LICAPI DESTROY 41\n", world);
+    expect(destroy.commands_applied == 1 && !world.alive(entity),
+           "NEXUS DESTROY should remove script-owned entities");
+}
+
 void test_voidbound_gameplay() {
     lic::game::Voidbound game;
     expect(game.state() == lic::game::RunState::Menu, "Voidbound should open to a main menu");
@@ -377,6 +421,7 @@ int main() {
     test_scene_serialization();
     test_legacy_scene_compatibility();
     test_material_resources();
+    test_nexus_scene_api();
     test_mesh_reference_scene_roundtrip();
     test_gltf_import();
     test_gameplay_settings_validation();
