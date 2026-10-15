@@ -1,4 +1,5 @@
 #include <lic/renderer/vulkan_viewport.hpp>
+#include <lic/assets/gltf.hpp>
 #include <lic/editor/editor_ui.hpp>
 #include <lic/world/scene.hpp>
 
@@ -20,6 +21,8 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <cstddef>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -29,6 +32,9 @@
 #include <string_view>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace lic::renderer {
@@ -72,6 +78,15 @@ struct alignas(16) SceneObjectPushConstants final {
 static_assert(sizeof(SceneObjectPushConstants) == 96);
 
 class VulkanViewport final {
+    struct GpuMesh final {
+        VkBuffer vertex_buffer{VK_NULL_HANDLE};
+        VkDeviceMemory vertex_memory{VK_NULL_HANDLE};
+        VkBuffer index_buffer{VK_NULL_HANDLE};
+        VkDeviceMemory index_memory{VK_NULL_HANDLE};
+        std::uint32_t index_count{};
+        std::vector<lic::assets::MeshPrimitive> primitives;
+    };
+
 public:
     explicit VulkanViewport(const std::filesystem::path& executablePath, bool startInGame)
         : shaderDirectory_(executablePath.parent_path() / "shaders"),
@@ -162,6 +177,9 @@ private:
     std::vector<VkFence> imageFences_;
     std::size_t frameIndex_{};
     bool glfwInitialized_{};
+    std::unordered_map<std::string, GpuMesh> meshCache_;
+    std::unordered_set<std::string> failedMeshPaths_;
+    GpuMesh cubeMesh_{};
 
     void initialize_window() {
         if (glfwInit() != GLFW_TRUE) {
@@ -520,6 +538,130 @@ private:
         throw std::runtime_error("No compatible Vulkan memory type was found.");
     }
 
+    void create_host_buffer(const void* source, std::size_t byteCount, VkBufferUsageFlags usage,
+                            VkBuffer& buffer, VkDeviceMemory& memory) {
+        if (source == nullptr || byteCount == 0) throw std::invalid_argument("Cannot upload an empty mesh buffer");
+        VkBufferCreateInfo bufferInfo{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+        bufferInfo.size = static_cast<VkDeviceSize>(byteCount);
+        bufferInfo.usage = usage;
+        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        check(vkCreateBuffer(device_, &bufferInfo, nullptr, &buffer), "vkCreateBuffer(mesh)");
+        try {
+            VkMemoryRequirements requirements{};
+            vkGetBufferMemoryRequirements(device_, buffer, &requirements);
+            VkMemoryAllocateInfo allocation{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+            allocation.allocationSize = requirements.size;
+            allocation.memoryTypeIndex = find_memory_type(
+                requirements.memoryTypeBits,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+            check(vkAllocateMemory(device_, &allocation, nullptr, &memory), "vkAllocateMemory(mesh)");
+            check(vkBindBufferMemory(device_, buffer, memory, 0), "vkBindBufferMemory(mesh)");
+            void* mapped = nullptr;
+            check(vkMapMemory(device_, memory, 0, static_cast<VkDeviceSize>(byteCount), 0, &mapped),
+                  "vkMapMemory(mesh)");
+            std::memcpy(mapped, source, byteCount);
+            vkUnmapMemory(device_, memory);
+        } catch (...) {
+            if (memory != VK_NULL_HANDLE) {
+                vkFreeMemory(device_, memory, nullptr);
+                memory = VK_NULL_HANDLE;
+            }
+            if (buffer != VK_NULL_HANDLE) {
+                vkDestroyBuffer(device_, buffer, nullptr);
+                buffer = VK_NULL_HANDLE;
+            }
+            throw;
+        }
+    }
+
+    void destroy_mesh(GpuMesh& mesh) noexcept {
+        if (device_ != VK_NULL_HANDLE) {
+            if (mesh.index_buffer != VK_NULL_HANDLE) vkDestroyBuffer(device_, mesh.index_buffer, nullptr);
+            if (mesh.index_memory != VK_NULL_HANDLE) vkFreeMemory(device_, mesh.index_memory, nullptr);
+            if (mesh.vertex_buffer != VK_NULL_HANDLE) vkDestroyBuffer(device_, mesh.vertex_buffer, nullptr);
+            if (mesh.vertex_memory != VK_NULL_HANDLE) vkFreeMemory(device_, mesh.vertex_memory, nullptr);
+        }
+        mesh = GpuMesh{};
+    }
+
+    [[nodiscard]] GpuMesh create_gpu_mesh(const std::vector<lic::assets::MeshVertex>& vertices,
+                                          const std::vector<std::uint32_t>& indices,
+                                          std::vector<lic::assets::MeshPrimitive> primitives) {
+        if (vertices.empty() || indices.empty()) throw std::runtime_error("Mesh has no vertices or indices");
+        if (indices.size() > std::numeric_limits<std::uint32_t>::max())
+            throw std::runtime_error("Mesh index count exceeds the Vulkan indexed draw limit");
+        GpuMesh mesh;
+        try {
+            create_host_buffer(vertices.data(), vertices.size() * sizeof(lic::assets::MeshVertex),
+                               VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, mesh.vertex_buffer, mesh.vertex_memory);
+            create_host_buffer(indices.data(), indices.size() * sizeof(std::uint32_t),
+                               VK_BUFFER_USAGE_INDEX_BUFFER_BIT, mesh.index_buffer, mesh.index_memory);
+            mesh.index_count = static_cast<std::uint32_t>(indices.size());
+            mesh.primitives = std::move(primitives);
+            if (mesh.primitives.empty()) {
+                lic::assets::MeshPrimitive primitive;
+                primitive.first_index = 0;
+                primitive.index_count = mesh.index_count;
+                primitive.surface.color = {1.0F, 1.0F, 1.0F, 1.0F};
+                primitive.surface.metallic = 0.0F;
+                primitive.surface.roughness = 0.68F;
+                mesh.primitives.push_back(std::move(primitive));
+            }
+        } catch (...) {
+            destroy_mesh(mesh);
+            throw;
+        }
+        return mesh;
+    }
+
+    [[nodiscard]] GpuMesh& ensure_cube_mesh() {
+        if (cubeMesh_.vertex_buffer != VK_NULL_HANDLE) return cubeMesh_;
+        constexpr float s = 0.62F;
+        std::vector<lic::assets::MeshVertex> vertices;
+        std::vector<std::uint32_t> indices;
+        vertices.reserve(24);
+        indices.reserve(36);
+        const auto addFace = [&](std::array<float, 3> normal,
+                                 std::array<std::array<float, 3>, 4> points) {
+            constexpr std::array<std::array<float, 2>, 4> uv{{
+                {{0.0F, 0.0F}}, {{1.0F, 0.0F}}, {{1.0F, 1.0F}}, {{0.0F, 1.0F}}
+            }};
+            const auto base = static_cast<std::uint32_t>(vertices.size());
+            for (std::size_t i = 0; i < points.size(); ++i)
+                vertices.push_back(lic::assets::MeshVertex{points[i], normal, uv[i]});
+            for (const std::uint32_t index : {0U, 1U, 2U, 2U, 3U, 0U}) indices.push_back(base + index);
+        };
+        addFace({0.0F, 0.0F, 1.0F}, {{{-s,-s,s}, {s,-s,s}, {s,s,s}, {-s,s,s}}});
+        addFace({0.0F, 0.0F,-1.0F}, {{{s,-s,-s}, {-s,-s,-s}, {-s,s,-s}, {s,s,-s}}});
+        addFace({1.0F, 0.0F, 0.0F}, {{{s,-s,s}, {s,-s,-s}, {s,s,-s}, {s,s,s}}});
+        addFace({-1.0F,0.0F,0.0F}, {{{-s,-s,-s}, {-s,-s,s}, {-s,s,s}, {-s,s,-s}}});
+        addFace({0.0F,1.0F,0.0F}, {{{-s,s,s}, {s,s,s}, {s,s,-s}, {-s,s,-s}}});
+        addFace({0.0F,-1.0F,0.0F}, {{{-s,-s,-s}, {s,-s,-s}, {s,-s,s}, {-s,-s,s}}});
+        cubeMesh_ = create_gpu_mesh(vertices, indices, {});
+        return cubeMesh_;
+    }
+
+    [[nodiscard]] GpuMesh* resolve_model_mesh(const std::string& relativePath) {
+        if (!lic::world::is_safe_mesh_reference(relativePath)) return nullptr;
+        const auto absolutePath = (editor_ui_.project_root_path() /
+            std::filesystem::path(relativePath)).lexically_normal();
+        const std::string key = absolutePath.string();
+        if (const auto found = meshCache_.find(key); found != meshCache_.end()) return &found->second;
+        if (failedMeshPaths_.contains(key)) return nullptr;
+        try {
+            const auto asset = lic::assets::load_gltf(absolutePath);
+            auto mesh = create_gpu_mesh(asset.vertices, asset.indices, asset.primitives);
+            const auto [iterator, inserted] = meshCache_.emplace(key, std::move(mesh));
+            if (!inserted) destroy_mesh(mesh);
+            return &iterator->second;
+        } catch (const std::exception& error) {
+            failedMeshPaths_.insert(key);
+            std::cerr << "[LIC][Assets] Cannot load " << absolutePath.string()
+                      << ": " << error.what() << '\n';
+            return nullptr;
+        }
+    }
+
     void create_depth_resources() {
         depthImages_.resize(swapchainImages_.size(), VK_NULL_HANDLE);
         depthMemories_.resize(swapchainImages_.size(), VK_NULL_HANDLE);
@@ -607,7 +749,22 @@ private:
             stages[1].module = fragmentModule;
             stages[1].pName = "main";
 
+            VkVertexInputBindingDescription vertexBinding{};
+            vertexBinding.binding = 0;
+            vertexBinding.stride = static_cast<std::uint32_t>(sizeof(lic::assets::MeshVertex));
+            vertexBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+            std::array<VkVertexInputAttributeDescription, 3> vertexAttributes{};
+            vertexAttributes[0] = {0, 0, VK_FORMAT_R32G32B32_SFLOAT,
+                                   static_cast<std::uint32_t>(offsetof(lic::assets::MeshVertex, position))};
+            vertexAttributes[1] = {1, 0, VK_FORMAT_R32G32B32_SFLOAT,
+                                   static_cast<std::uint32_t>(offsetof(lic::assets::MeshVertex, normal))};
+            vertexAttributes[2] = {2, 0, VK_FORMAT_R32G32_SFLOAT,
+                                   static_cast<std::uint32_t>(offsetof(lic::assets::MeshVertex, texcoord))};
             VkPipelineVertexInputStateCreateInfo vertexInput{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
+            vertexInput.vertexBindingDescriptionCount = 1;
+            vertexInput.pVertexBindingDescriptions = &vertexBinding;
+            vertexInput.vertexAttributeDescriptionCount = static_cast<std::uint32_t>(vertexAttributes.size());
+            vertexInput.pVertexAttributeDescriptions = vertexAttributes.data();
             VkPipelineInputAssemblyStateCreateInfo inputAssembly{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
             inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
@@ -760,6 +917,41 @@ private:
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
 
         const auto& world = editor_ui_.render_world();
+        const auto drawObject = [&](const lic::world::Transform& transform,
+                                    const lic::world::Appearance& appearance,
+                                    const GpuMesh& mesh, bool useModelMaterials) {
+            const std::array<VkBuffer, 1> vertexBuffers{mesh.vertex_buffer};
+            constexpr VkDeviceSize offsets[]{0};
+            vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers.data(), offsets);
+            vkCmdBindIndexBuffer(commandBuffer, mesh.index_buffer, 0, VK_INDEX_TYPE_UINT32);
+
+            for (const auto& primitive : mesh.primitives) {
+                if (primitive.index_count == 0) continue;
+                lic::world::Appearance surface = useModelMaterials ? primitive.surface : appearance;
+                if (useModelMaterials) {
+                    for (std::size_t c = 0; c < 4; ++c) surface.color[c] *= appearance.color[c];
+                }
+                constexpr float radians = 0.01745329251994329577F;
+                SceneObjectPushConstants push{};
+                for (std::size_t axis = 0; axis < 3; ++axis) {
+                    push.position[axis] = transform.position[axis];
+                    push.rotation[axis] = transform.rotation_degrees[axis] * radians;
+                    push.scale[axis] = transform.scale[axis];
+                }
+                if (editor_ui_.playing()) push.rotation[1] += editor_ui_.play_rotation_degrees() * radians;
+                for (std::size_t c = 0; c < 4; ++c) push.color[c] = surface.color[c];
+                push.material[0] = surface.metallic;
+                push.material[1] = surface.roughness;
+                push.material[2] = surface.emission_strength;
+                push.camera[0] = editor_ui_.camera_yaw();
+                push.camera[1] = editor_ui_.camera_pitch();
+                push.camera[2] = editor_ui_.camera_zoom();
+                vkCmdPushConstants(commandBuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0,
+                                   static_cast<std::uint32_t>(sizeof(push)), &push);
+                vkCmdDrawIndexed(commandBuffer, primitive.index_count, 1, primitive.first_index, 0, 0);
+            }
+        };
+
         world.each<lic::world::NodeName>([&](lic::world::Entity entity, const lic::world::NodeName&) {
             if (!world.has<lic::world::Transform>(entity) ||
                 !world.has<lic::world::NodeKindComponent>(entity) ||
@@ -769,29 +961,17 @@ private:
             if (!lic::world::node_kind_renders_mesh(world.get<lic::world::NodeKindComponent>(entity).value)) return;
             const auto& transform = world.get<lic::world::Transform>(entity);
             const auto& appearance = world.get<lic::world::Appearance>(entity);
-            constexpr float radians = 0.01745329251994329577F;
-            SceneObjectPushConstants push{};
-            for (std::size_t axis = 0; axis < 3; ++axis) {
-                push.position[axis] = transform.position[axis];
-                push.rotation[axis] = transform.rotation_degrees[axis] * radians;
-                push.scale[axis] = transform.scale[axis];
+            if (world.has<lic::world::MeshResourceReference>(entity)) {
+                const auto& reference = world.get<lic::world::MeshResourceReference>(entity);
+                if (auto* mesh = resolve_model_mesh(reference.path)) {
+                    drawObject(transform, appearance, *mesh, true);
+                    return;
+                }
             }
-            if (editor_ui_.playing()) push.rotation[1] += editor_ui_.play_rotation_degrees() * radians;
-            push.color[0] = appearance.color[0];
-            push.color[1] = appearance.color[1];
-            push.color[2] = appearance.color[2];
-            push.color[3] = appearance.color[3];
-            push.material[0] = appearance.metallic;
-            push.material[1] = appearance.roughness;
-            push.material[2] = appearance.emission_strength;
-            push.camera[0] = editor_ui_.camera_yaw();
-            push.camera[1] = editor_ui_.camera_pitch();
-            push.camera[2] = editor_ui_.camera_zoom();
-            vkCmdPushConstants(commandBuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0,
-                               static_cast<std::uint32_t>(sizeof(push)), &push);
-            vkCmdDraw(commandBuffer, 36, 1, 0, 0);
+            drawObject(transform, appearance, ensure_cube_mesh(), false);
         });
         editor_ui_.render(commandBuffer);
+
         vkCmdEndRenderPass(commandBuffer);
         check(vkEndCommandBuffer(commandBuffer), "vkEndCommandBuffer");
     }
@@ -977,6 +1157,10 @@ private:
             vkDeviceWaitIdle(device_);
             editor_ui_.shutdown_renderer();
             cleanup_swapchain();
+            for (auto& entry : meshCache_) destroy_mesh(entry.second);
+            meshCache_.clear();
+            failedMeshPaths_.clear();
+            destroy_mesh(cubeMesh_);
             for (std::size_t i = 0; i < imageAvailable_.size(); ++i) {
                 if (imageAvailable_[i] != VK_NULL_HANDLE) {
                     vkDestroySemaphore(device_, imageAvailable_[i], nullptr);
