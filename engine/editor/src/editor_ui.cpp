@@ -509,6 +509,10 @@ void EditorUi::duplicate_selected() {
     transform.position[0] += 0.35F;
     const auto copy = lic::world::create_node(world_, kind, name, transform, appearance);
     world_.get<lic::world::NodeEnabled>(copy).value = enabled;
+    if (world_.has<lic::world::MeshResourceReference>(selected_entity_)) {
+        world_.emplace<lic::world::MeshResourceReference>(
+            copy, world_.get<lic::world::MeshResourceReference>(selected_entity_));
+    }
     selected_entity_ = copy;
     mark_dirty();
     log("Duplicated node: " + name);
@@ -786,6 +790,12 @@ void EditorUi::draw_inspector() {
         }
     }
 
+    if (world_.has<lic::world::MeshResourceReference>(selected_entity_)) {
+        const auto& mesh = world_.get<lic::world::MeshResourceReference>(selected_entity_);
+        ImGui::TextDisabled("MESH RESOURCE");
+        ImGui::TextWrapped("%s", mesh.path.c_str());
+    }
+
     if (kind.value == lic::world::NodeKind::MeshInstance3D ||
         kind.value == lic::world::NodeKind::StaticBody3D) {
         if (ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -864,7 +874,7 @@ void EditorUi::draw_bottom_panel() {
     if (ImGui::BeginTabBar("LICBottomTabs")) {
         if (ImGui::BeginTabItem("Output")) {
             ImGui::Text("LIC Engine 0.1.0  |  C++23  |  Vulkan");
-            ImGui::TextWrapped("Primitive cube preview, scene nodes, transform/material editing and versioned scene files.");
+            ImGui::TextWrapped("glTF/GLB model import, scene nodes, versioned mesh references, LICMAT materials and NEXUS scene commands.");
             ImGui::TextDisabled("%s", status_message_.c_str());
             ImGui::EndTabItem();
         }

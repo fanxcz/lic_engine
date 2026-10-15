@@ -87,3 +87,12 @@ Prove the complete path on Windows and Linux desktop first. Keep path, input, wi
 The NEXUS compiler and its standard library are shipped beside the graphical editor. `assets/scripts/GameRules.nx` is the checked-in source of gameplay balance; the editor copies it into the user's writable project without overwriting edits. The engine validates the script's printed configuration values before applying them to the simulation. NEXUS does not yet run in-process as a per-frame gameplay VM, so Vulkan, the OS/event loop and ECS storage are native modules; the intended next step is a supported host API for NEXUS entity/input/update callbacks.
 
 Material resources are versioned `.licmat` text assets, independent of Vulkan handles. Each scene object's appearance stores linear base RGBA, metallic, roughness and emission strength. Scene format v2 serializes these properties, while the loader remains compatible with v1 scenes using default surface parameters. Presets are copied into a project only when a preset file is absent, so user-authored materials survive editor updates.
+
+
+## glTF assets and NEXUS scene API
+
+The asset module uses the vendored single-header `cgltf` parser (MIT licensed) to load glTF 2.0 JSON and GLB files into a CPU mesh representation. Triangle primitives preserve material boundaries and metallic-roughness factors; external buffers/images are copied into project-local `Assets/Models` during import. Scene files use `LICSCENE 3` to store project-relative model paths and remain able to read versions 1 and 2. The importer restricts file size, vertex/index counts and dependency paths; images are not yet sampled by the viewport shader.
+
+The Vulkan renderer uploads indexed vertex and index buffers, caches imported models for the life of the device, and draws each primitive with its material factors. Imported model cache entries are released before destroying the Vulkan device. Current mesh buffers use host-visible/coherent memory for a simple portable path; a device-local staging uploader is a future performance improvement.
+
+NEXUS scripts can emit validated `LICAPI` scene commands. The host supports spawn/edit/enable/destroy operations for script-owned mesh nodes and applies these commands to the editor scene when rules are tested, replaying them into the next VOIDBOUND run. This is a setup-time bridge, not a per-frame virtual machine. Input/update/collision callbacks remain a follow-up milestone requiring persistent embedded NEXUS execution.
