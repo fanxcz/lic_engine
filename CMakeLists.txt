@@ -298,7 +298,8 @@ if(BUILD_TESTING AND LIC_ENGINE_BUILD_TESTS)
             add_test(NAME lic_runtime_session_tests
                 COMMAND lic_runtime_session_tests "${LIC_NEXUS_RUNTIME_SMOKE}"
                     "${CMAKE_CURRENT_BINARY_DIR}/lic-runtime-session-test.log")
-            set_tests_properties(lic_runtime_session_tests PROPERTIES DEPENDS lic_nexus_runtime_build)
+            set_tests_properties(lic_nexus_runtime_build PROPERTIES FIXTURES_SETUP nexus_runtime_program)
+            set_tests_properties(lic_runtime_session_tests PROPERTIES FIXTURES_REQUIRED nexus_runtime_program)
         endif()
     endif()
     add_executable(lic_core_tests tests/core_tests.cpp)

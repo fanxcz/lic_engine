@@ -1,0 +1,75 @@
+// Persistent NEXUS runtime demo for LIC Engine.
+// The host sends event codes and integer input values over stdin, one per line.
+// A frame response must end with LICFRAME_END. Event 0 exits; event 1 is an update.
+fn lic_spawn_box(id: i64, x: i64, y: i64, z: i64, scale: i64, r: i64, g: i64, b: i64) {
+    print("LICAPI SPAWN_BOX " + str_i64(id) + " " + str_i64(x) + " " + str_i64(y) + " " + str_i64(z) + " " + str_i64(scale) + " " + str_i64(r) + " " + str_i64(g) + " " + str_i64(b))
+}
+fn lic_move_by(id: i64, x: i64, y: i64, z: i64) {
+    print("LICAPI MOVE_BY " + str_i64(id) + " " + str_i64(x) + " " + str_i64(y) + " " + str_i64(z))
+}
+fn lic_set_color(id: i64, r: i64, g: i64, b: i64) {
+    print("LICAPI SET_COLOR " + str_i64(id) + " " + str_i64(r) + " " + str_i64(g) + " " + str_i64(b))
+}
+fn lic_set_surface(id: i64, metallic: i64, roughness: i64, emission: i64) {
+    print("LICAPI SET_SURFACE " + str_i64(id) + " " + str_i64(metallic) + " " + str_i64(roughness) + " " + str_i64(emission))
+}
+// Native NEXUS currently provides line input as strings. This bounded parser
+// converts one decimal integer without requiring the LLVM-only input_i64 builtin.
+fn read_i64() -> i64 {
+    let raw = input("")
+    let length = string.len(raw)
+    let mut index: i64 = 0
+    let mut sign: i64 = 1
+    if length > 0 {
+        if string.byte_at(raw, 0) == 45 {
+            sign = -1
+            index = 1
+        }
+    }
+    let mut value: i64 = 0
+    while index < length {
+        let digit = string.byte_at(raw, index) - 48
+        if digit < 0 { return 0 }
+        if digit > 9 { return 0 }
+        value = value * 10 + digit
+        index = index + 1
+    }
+    return value * sign
+}
+
+fn on_start() {
+    lic_spawn_box(900, 0, 0, 0, 100, 80, 720, 1000)
+    lic_set_surface(900, 350, 260, 250)
+}
+fn on_update(delta_ms: i64, move_x: i64, move_z: i64, dash: i64, fire: i64) {
+    lic_move_by(900, move_x * delta_ms / 1000, 0, move_z * delta_ms / 1000)
+    if dash == 1 {
+        lic_set_color(900, 1000, 880, 260)
+    } else if fire == 1 {
+        lic_set_surface(900, 300, 180, 1800)
+    } else {
+        lic_set_surface(900, 350, 260, 250)
+    }
+}
+fn main() {
+    on_start()
+    print("LICFRAME_END")
+    let mut running: i64 = 1
+    while running == 1 {
+        let event = read_i64()
+        if event == 0 {
+            print("LICFRAME_END")
+            running = 0
+        } else if event == 1 {
+            let delta_ms = read_i64()
+            let move_x = read_i64()
+            let move_z = read_i64()
+            let dash = read_i64()
+            let fire = read_i64()
+            on_update(delta_ms, move_x, move_z, dash, fire)
+            print("LICFRAME_END")
+        } else {
+            print("LICFRAME_END")
+        }
+    }
+}
