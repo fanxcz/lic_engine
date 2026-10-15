@@ -16,6 +16,7 @@ fn lic_set_surface(id: i64, metallic: i64, roughness: i64, emission: i64) {
 // Native NEXUS currently provides line input as strings. This bounded parser
 // converts one decimal integer without requiring the LLVM-only input_i64 builtin.
 fn read_i64() -> i64 {
+    print("LICINPUT")
     let raw = input("")
     let length = string.len(raw)
     let mut index: i64 = 0

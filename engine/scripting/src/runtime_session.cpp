@@ -33,19 +33,11 @@
 namespace lic::scripting {
 namespace {
 constexpr std::string_view kFrameEnd = "LICFRAME_END";
+constexpr std::string_view kInputRequest = "LICINPUT";
 constexpr std::size_t kMaxOutputBytes = 1024U * 1024U;
 
 [[nodiscard]] RuntimeSessionReply failure(std::string message, std::string output = {}) {
     return RuntimeSessionReply{false, std::move(output), std::move(message)};
-}
-[[nodiscard]] std::string make_request(const std::vector<std::int64_t>& values) {
-    std::string request;
-    request.reserve(values.size() * 24U);
-    for (const auto value : values) {
-        request += std::to_string(value);
-        request += '\n';
-    }
-    return request;
 }
 #ifdef _WIN32
 [[nodiscard]] std::wstring widen_utf8(const std::string& input) {
@@ -102,21 +94,25 @@ struct RuntimeSession::Impl final {
     int child_output{-1};
 #endif
 
-    [[nodiscard]] RuntimeSessionReply read_frame(std::chrono::milliseconds timeout) {
+    [[nodiscard]] RuntimeSessionReply wait_for_marker(std::string_view expected,
+                                                         std::chrono::milliseconds timeout,
+                                                         std::string& output) {
         if (!running) return failure("NEXUS runtime is not running");
         const auto deadline = std::chrono::steady_clock::now() + timeout;
-        std::string output;
         while (std::chrono::steady_clock::now() < deadline) {
             const auto newline = pending.find('\n');
             if (newline != std::string::npos) {
                 std::string line = pending.substr(0, newline);
                 pending.erase(0, newline + 1U);
                 if (!line.empty() && line.back() == '\r') line.pop_back();
-                if (line == kFrameEnd) return RuntimeSessionReply{true, std::move(output), {}};
+                if (line == expected) return RuntimeSessionReply{true, {}, {}};
+                if (line == kFrameEnd || line == kInputRequest) {
+                    return failure("Unexpected NEXUS runtime protocol marker: " + line);
+                }
                 output += line;
                 output.push_back('\n');
                 if (output.size() > kMaxOutputBytes || pending.size() > kMaxOutputBytes) {
-                    return failure("NEXUS runtime response exceeded the 1 MiB limit", std::move(output));
+                    return failure("NEXUS runtime response exceeded the 1 MiB limit");
                 }
                 continue;
             }
@@ -125,7 +121,7 @@ struct RuntimeSession::Impl final {
             if (!PeekNamedPipe(child_output, nullptr, 0, nullptr, &available, nullptr)) {
                 running = false;
                 return failure("NEXUS runtime output pipe closed (Windows error " +
-                               std::to_string(GetLastError()) + ")", std::move(output));
+                               std::to_string(GetLastError()) + ")");
             }
             if (available > 0) {
                 std::array<char, 4096> chunk{};
@@ -133,14 +129,18 @@ struct RuntimeSession::Impl final {
                 DWORD readCount = 0;
                 if (!ReadFile(child_output, chunk.data(), count, &readCount, nullptr) || readCount == 0) {
                     running = false;
-                    return failure("Could not read NEXUS runtime output", std::move(output));
+                    return failure("Could not read NEXUS runtime output");
                 }
                 pending.append(chunk.data(), static_cast<std::size_t>(readCount));
+                if (pending.size() > kMaxOutputBytes) {
+                    running = false;
+                    return failure("NEXUS runtime line exceeded the 1 MiB limit");
+                }
                 continue;
             }
             if (WaitForSingleObject(process, 0) == WAIT_OBJECT_0) {
                 running = false;
-                return failure("NEXUS runtime exited without LICFRAME_END", std::move(output));
+                return failure("NEXUS runtime exited without the expected protocol marker");
             }
             Sleep(1);
 #else
@@ -153,7 +153,7 @@ struct RuntimeSession::Impl final {
                 if (errno == EINTR) continue;
                 running = false;
                 return failure("poll() failed while reading NEXUS runtime: " +
-                               std::error_code(errno, std::generic_category()).message(), std::move(output));
+                               std::error_code(errno, std::generic_category()).message());
             }
             if (ready == 0) continue;
             if ((descriptor.revents & POLLIN) != 0) {
@@ -161,19 +161,23 @@ struct RuntimeSession::Impl final {
                 const ssize_t count = read(child_output, chunk.data(), chunk.size());
                 if (count > 0) {
                     pending.append(chunk.data(), static_cast<std::size_t>(count));
+                    if (pending.size() > kMaxOutputBytes) {
+                        running = false;
+                        return failure("NEXUS runtime line exceeded the 1 MiB limit");
+                    }
                     continue;
                 }
                 if (count < 0 && errno == EINTR) continue;
                 running = false;
-                return failure("NEXUS runtime output pipe closed", std::move(output));
+                return failure("NEXUS runtime output pipe closed");
             }
             if ((descriptor.revents & (POLLHUP | POLLERR | POLLNVAL)) != 0) {
                 running = false;
-                return failure("NEXUS runtime exited without LICFRAME_END", std::move(output));
+                return failure("NEXUS runtime exited without the expected protocol marker");
             }
 #endif
         }
-        return failure("NEXUS runtime frame timed out", std::move(output));
+        return failure("NEXUS runtime protocol timed out waiting for " + std::string(expected));
     }
 
     [[nodiscard]] bool write_request(std::string_view request, std::string& error) {
@@ -224,9 +228,14 @@ struct RuntimeSession::Impl final {
 
     void terminate() noexcept {
         if (running) {
-            std::string ignored;
-            (void)write_request("0\n", ignored);
-            (void)read_frame(std::chrono::milliseconds(120));
+            std::string output;
+            const auto prompt = wait_for_marker(kInputRequest, std::chrono::milliseconds(100), output);
+            if (prompt.ok) {
+                std::string ignored;
+                if (write_request("0\n", ignored)) {
+                    (void)wait_for_marker(kFrameEnd, std::chrono::milliseconds(120), output);
+                }
+            }
         }
         running = false;
         close_input();
@@ -380,26 +389,42 @@ RuntimeSessionReply RuntimeSession::start(
     impl_->process = child;
     impl_->running = true;
 #endif
-    auto startup = impl_->read_frame(startup_timeout);
+    std::string output;
+    const auto startup = impl_->wait_for_marker(kFrameEnd, startup_timeout, output);
     if (!startup.ok) {
         impl_->terminate();
-        return startup;
+        return failure(startup.error, std::move(output));
     }
-    return startup;
+    return RuntimeSessionReply{true, std::move(output), {}};
 }
 
 RuntimeSessionReply RuntimeSession::exchange(const std::vector<std::int64_t>& values,
                                              std::chrono::milliseconds timeout) {
     if (!impl_ || !impl_->running) return failure("NEXUS runtime is not running");
-    const std::string request = make_request(values);
-    std::string error;
-    if (!impl_->write_request(request, error)) {
-        impl_->terminate();
-        return failure(std::move(error));
+    if (values.empty()) return failure("NEXUS runtime request cannot be empty");
+    std::string output;
+    for (const std::int64_t value : values) {
+        // The native NEXUS input helper reads one line at a time and does not
+        // preserve extra bytes from a multi-line pipe read. Wait for LICINPUT
+        // before sending every value, so no subsequent event data can be lost.
+        const auto prompt = impl_->wait_for_marker(kInputRequest, timeout, output);
+        if (!prompt.ok) {
+            impl_->terminate();
+            return failure(prompt.error, std::move(output));
+        }
+        std::string error;
+        const std::string request = std::to_string(value) + '\n';
+        if (!impl_->write_request(request, error)) {
+            impl_->terminate();
+            return failure(std::move(error), std::move(output));
+        }
     }
-    auto response = impl_->read_frame(timeout);
-    if (!response.ok) impl_->terminate();
-    return response;
+    const auto frame = impl_->wait_for_marker(kFrameEnd, timeout, output);
+    if (!frame.ok) {
+        impl_->terminate();
+        return failure(frame.error, std::move(output));
+    }
+    return RuntimeSessionReply{true, std::move(output), {}};
 }
 
 void RuntimeSession::stop() noexcept {
