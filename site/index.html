@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#171819">
-  <meta name="description" content="LIC Engine is a native C++23 and Vulkan game-engine project with NEXUS gameplay scripts and reusable LICMAT materials.">
+  <meta name="description" content="LIC Engine is a native C++23 and Vulkan game engine with glTF/GLB model import, LICMAT materials, and NEXUS ECS scene commands.">
   <title>LIC Engine</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -24,7 +24,7 @@
     <section class="intro">
       <p class="kicker">OPEN SOURCE · EARLY DEVELOPMENT</p>
       <h1>LIC Engine</h1>
-      <p class="intro-copy">A native C++23 and Vulkan game-engine project with a scene editor, the VOIDBOUND survival prototype, NEXUS gameplay rules, and reusable material assets.</p>
+      <p class="intro-copy">A native C++23 and Vulkan game-engine project with a scene editor, indexed glTF/GLB meshes, reusable materials, NEXUS scene commands and the VOIDBOUND survival prototype.</p>
       <div class="intro-links">
         <a class="primary-link" href="https://github.com/fanxcz/lic_engine/releases/download/continuous/lic-engine-windows-x64.zip">Download Windows build <span>↓</span></a>
         <a href="https://github.com/fanxcz/lic_engine">Browse source ↗</a>
@@ -58,15 +58,16 @@
       <div class="feature-list">
         <article><h3>Scene editor</h3><p>Entity hierarchy, transforms, scene save/load, viewport controls and a compact inspector.</p></article>
         <article><h3>VOIDBOUND</h3><p>3D arena-survival prototype with enemy waves, movement, dash, projectiles, XP and upgrades.</p></article>
-        <article><h3>NEXUS scripting</h3><p>Edit and compile <code>GameRules.nx</code> from the editor. Balance values control waves, enemies, scoring and upgrades.</p></article>
+        <article><h3>NEXUS scripting</h3><p>Edit and compile <code>GameRules.nx</code>. Scene API commands can create, move, rotate, recolor, enable and destroy ECS mesh nodes.</p></article>
+        <article><h3>glTF / GLB assets</h3><p>Import triangle meshes, normals, UV0 and metallic-roughness factors. Scenes preserve project-relative model references.</p></article>
         <article><h3>LICMAT materials</h3><p>Reusable, versioned text materials with base color, metallic, roughness and emission. Scene files preserve surface settings.</p></article>
       </div>
     </section>
 
     <section class="section project-status">
       <h2>Project status</h2>
-      <p>The Vulkan viewport currently renders primitive cube geometry. LICMAT surface parameters work with that renderer; imported glTF models, texture maps, full PBR lighting, general physics, and mobile/Web packages are still in development.</p>
-      <p class="inline-links"><a href="https://github.com/fanxcz/lic_engine/blob/main/docs/ROADMAP.md">Roadmap ↗</a><a href="https://github.com/fanxcz/lic_engine/blob/main/docs/NEXUS_INTEGRATION.md">NEXUS guide ↗</a><a href="https://github.com/fanxcz/lic_engine/blob/main/docs/MATERIAL_FORMAT.md">Material format ↗</a></p>
+      <p>The Vulkan viewport now renders imported indexed meshes and primitive cubes. Material factors and external asset paths are supported; texture sampling, full PBR lighting, shadows, per-frame NEXUS callbacks, general physics and mobile/Web builds remain in development.</p>
+      <p class="inline-links"><a href="https://github.com/fanxcz/lic_engine/blob/main/docs/GLTF_IMPORT.md">glTF import ↗</a><a href="https://github.com/fanxcz/lic_engine/blob/main/docs/NEXUS_API.md">NEXUS Scene API ↗</a><a href="https://github.com/fanxcz/lic_engine/blob/main/docs/MATERIAL_FORMAT.md">Material format ↗</a><a href="https://github.com/fanxcz/lic_engine/blob/main/docs/ROADMAP.md">Roadmap ↗</a></p>
     </section>
   </main>
 
