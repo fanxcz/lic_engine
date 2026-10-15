@@ -2,7 +2,9 @@
 
 #include <lic/world/world.hpp>
 
+#include <algorithm>
 #include <array>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
@@ -136,6 +138,21 @@ struct NodeEnabled final {
     bool value{true};
 };
 
+struct MeshResourceReference final {
+    std::string path;
+};
+
+[[nodiscard]] inline bool is_safe_mesh_reference(std::string_view value) {
+    if (value.empty() || value.size() > 1024) return false;
+    const std::filesystem::path path{std::string(value)};
+    if (path.is_absolute() || path.has_root_name() || path.has_root_directory()) return false;
+    for (const auto& component : path) if (component == "..") return false;
+    std::string extension = path.extension().string();
+    std::transform(extension.begin(), extension.end(), extension.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return extension == ".gltf" || extension == ".glb";
+}
+
 [[nodiscard]] inline std::string_view node_kind_name(NodeKind kind) noexcept {
     switch (kind) {
     case NodeKind::Node3D: return "Node3D";
@@ -187,7 +204,7 @@ inline void save_scene(const World& world, const std::filesystem::path& path) {
             ++count;
         }
     });
-    output << "LICSCENE 2\n" << "nodes " << count << '\n' << std::setprecision(9);
+    output << "LICSCENE 3\n" << "nodes " << count << '\n' << std::setprecision(9);
     world.each<NodeName>([&](Entity entity, const NodeName& name) {
         if (!world.has<Transform>(entity) || !world.has<NodeKindComponent>(entity) ||
             !world.has<Appearance>(entity) || !world.has<NodeEnabled>(entity)) {
@@ -204,7 +221,9 @@ inline void save_scene(const World& world, const std::filesystem::path& path) {
         for (const float value : appearance.color) output << ' ' << value;
         output << ' ' << appearance.metallic << ' ' << appearance.roughness
                << ' ' << appearance.emission_strength;
-        output << ' ' << (enabled.value ? 1 : 0) << '\n';
+        const std::string meshPath = world.has<MeshResourceReference>(entity)
+            ? world.get<MeshResourceReference>(entity).path : std::string{};
+        output << ' ' << (enabled.value ? 1 : 0) << ' ' << std::quoted(meshPath) << '\n';
     });
     output.flush();
     if (!output) {
@@ -256,7 +275,7 @@ inline void load_scene(World& destination, const std::filesystem::path& path) {
     std::string nodesLabel;
     std::size_t count = 0;
     if (!(input >> magic >> version) || magic != "LICSCENE" ||
-        (version != 1 && version != 2) ||
+        (version != 1 && version != 2 && version != 3) ||
         !(input >> nodesLabel >> count) || nodesLabel != "nodes" || count > 4096) {
         throw std::runtime_error("Invalid or unsupported LIC scene header: " + path.string());
     }
@@ -267,6 +286,7 @@ inline void load_scene(World& destination, const std::filesystem::path& path) {
         Transform transform{};
         Appearance appearance{};
         bool enabled{true};
+        std::string mesh_path;
     };
     std::vector<NodeRecord> records;
     records.reserve(count);
@@ -311,6 +331,14 @@ inline void load_scene(World& destination, const std::filesystem::path& path) {
             throw std::runtime_error("Invalid node enabled state");
         }
         record.enabled = enabled == 1;
+        if (version >= 3) {
+            if (!(input >> std::quoted(record.mesh_path))) {
+                throw std::runtime_error("Invalid mesh reference at scene node " + std::to_string(i));
+            }
+            if (!record.mesh_path.empty() && !is_safe_mesh_reference(record.mesh_path)) {
+                throw std::runtime_error("Unsafe or unsupported model path: " + record.mesh_path);
+            }
+        }
         records.push_back(std::move(record));
     }
     input >> std::ws;
@@ -324,6 +352,10 @@ inline void load_scene(World& destination, const std::filesystem::path& path) {
         const Entity entity = create_node(replacement, record.kind, std::move(record.name),
                                           std::move(record.transform), std::move(record.appearance));
         replacement.get<NodeEnabled>(entity).value = record.enabled;
+        if (!record.mesh_path.empty()) {
+            replacement.emplace<MeshResourceReference>(entity,
+                MeshResourceReference{std::move(record.mesh_path)});
+        }
     }
     destination = std::move(replacement);
 }
