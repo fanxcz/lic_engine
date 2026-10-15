@@ -1,5 +1,6 @@
 #include <lic/editor/editor_ui.hpp>
 #include <lic/scripting/process.hpp>
+#include <lic/scripting/scene_api.hpp>
 
 #include <backends/imgui_impl_vulkan.h>
 #include <imgui.h>
@@ -129,6 +130,7 @@ void EditorUi::save_nexus_script() {
 }
 
 void EditorUi::execute_nexus_action(int action) {
+    if (action == 2) nexus_api_output_.clear();
     save_nexus_script();
     if (!std::filesystem::is_regular_file(nexus_executable_)) {
         nexus_status_ = "NEXUS compiler not found beside the LIC Engine executable";
@@ -188,9 +190,19 @@ void EditorUi::execute_nexus_action(int action) {
     lic::game::ScriptSettings settings{};
     parse_nexus_settings(runResult.output, settings);
     game_.apply_script_settings(settings);
+    nexus_api_output_ = runResult.output;
+    const auto apiResult = lic::scripting::apply_scene_commands(nexus_api_output_, world_);
+    for (const auto& message : apiResult.messages) log(message);
+    if (apiResult.commands_applied > 0) {
+        scene_dirty_ = true;
+        status_message_ = "NEXUS scene API: " + std::to_string(apiResult.commands_applied) + " commands";
+    }
     nexus_status_ = "NEXUS rules loaded: HP " + std::to_string(settings.player_health) +
         ", speed " + std::to_string(settings.player_speed) + "/100, enemies " +
         std::to_string(settings.enemy_spawn_cap) + " max per wave";
+    if (apiResult.commands_applied > 0) {
+        nexus_status_ += ", scene commands " + std::to_string(apiResult.commands_applied);
+    }
     log(nexus_status_);
 }
 
@@ -201,6 +213,8 @@ void EditorUi::apply_nexus_game_rules() {
 void EditorUi::start_game_run() {
     apply_nexus_game_rules();
     game_.start_run();
+    const auto apiResult = lic::scripting::apply_scene_commands(nexus_api_output_, game_.world());
+    for (const auto& message : apiResult.messages) log(message);
     apply_project_materials();
     if (nexus_status_.find("NEXUS rules loaded:") == std::string::npos) {
         log("Started with built-in game defaults because the NEXUS rules script did not load");
@@ -215,8 +229,8 @@ void EditorUi::draw_nexus_panel() {
         return;
     }
     ImGui::TextDisabled("%s", script_path_.string().c_str());
-    ImGui::TextWrapped("This is real NEXUS source. The game compiles and runs it when a new run starts; "
-                       "print lines beginning with LICCFG_ configure Voidbound.");
+    ImGui::TextWrapped("NEXUS controls gameplay balance with LICCFG_ values and can edit ECS mesh nodes through LICAPI commands. "
+                       "Scene commands apply when Test Rules runs and are replayed into the next game run.");
     ImGui::InputTextMultiline("##NEXUSGameRules", nexus_script_buffer_.data(),
         nexus_script_buffer_.size(), ImVec2(-1.0F, 280.0F), ImGuiInputTextFlags_AllowTabInput);
     if (ImGui::Button("Save")) save_nexus_script();

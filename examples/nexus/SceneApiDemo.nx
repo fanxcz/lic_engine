@@ -1,0 +1,30 @@
+// LIC Engine Scene API v1. IDs are stable. Positions/scales use hundredths; RGB uses thousandths.
+fn lic_spawn_box(id: i64, x: i64, y: i64, z: i64, scale: i64, r: i64, g: i64, b: i64) {
+    print("LICAPI SPAWN_BOX " + str_i64(id) + " " + str_i64(x) + " " + str_i64(y) + " " + str_i64(z) + " " + str_i64(scale) + " " + str_i64(r) + " " + str_i64(g) + " " + str_i64(b))
+}
+fn lic_set_position(id: i64, x: i64, y: i64, z: i64) {
+    print("LICAPI SET_POSITION " + str_i64(id) + " " + str_i64(x) + " " + str_i64(y) + " " + str_i64(z))
+}
+fn lic_set_rotation(id: i64, x: i64, y: i64, z: i64) {
+    print("LICAPI SET_ROTATION " + str_i64(id) + " " + str_i64(x) + " " + str_i64(y) + " " + str_i64(z))
+}
+fn lic_set_color(id: i64, r: i64, g: i64, b: i64) {
+    print("LICAPI SET_COLOR " + str_i64(id) + " " + str_i64(r) + " " + str_i64(g) + " " + str_i64(b))
+}
+fn lic_set_surface(id: i64, metallic: i64, roughness: i64, emission: i64) {
+    print("LICAPI SET_SURFACE " + str_i64(id) + " " + str_i64(metallic) + " " + str_i64(roughness) + " " + str_i64(emission))
+}
+fn lic_set_enabled(id: i64, enabled: i64) {
+    print("LICAPI SET_ENABLED " + str_i64(id) + " " + str_i64(enabled))
+}
+fn lic_destroy(id: i64) {
+    print("LICAPI DESTROY " + str_i64(id))
+}
+fn main() {
+    lic_spawn_box(100, -120, 0, 0, 70, 180, 540, 960)
+    lic_set_surface(100, 650, 220, 50)
+    lic_spawn_box(101, 120, 0, 0, 70, 960, 420, 150)
+    lic_set_position(101, 150, 30, 0)
+    lic_set_rotation(101, 0, 35, 0)
+    lic_set_color(101, 920, 470, 190)
+}

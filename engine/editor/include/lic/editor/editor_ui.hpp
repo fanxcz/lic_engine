@@ -71,6 +71,7 @@ private:
     std::array<char, 1024> model_import_path_{};
     std::array<lic::world::MaterialResource, 5> game_materials_{};
     std::string nexus_output_;
+    std::string nexus_api_output_;
     std::string nexus_status_{"NEXUS rules not loaded"};
     GLFWwindow* window_{};
     bool imgui_context_initialized_{};

@@ -55,7 +55,9 @@ add_library(LIC::Game ALIAS lic_game)
 target_include_directories(lic_game PUBLIC engine/game/include)
 target_link_libraries(lic_game PUBLIC LIC::World lic_build_options)
 
-add_library(lic_scripting engine/scripting/src/process.cpp)
+add_library(lic_scripting
+    engine/scripting/src/process.cpp
+    engine/scripting/src/scene_api.cpp)
 add_library(LIC::Scripting ALIAS lic_scripting)
 target_include_directories(lic_scripting PUBLIC engine/scripting/include)
 target_link_libraries(lic_scripting PUBLIC lic_build_options)
@@ -264,6 +266,8 @@ if(BUILD_TESTING AND LIC_ENGINE_BUILD_TESTS)
         set_tests_properties(lic_nexus_version PROPERTIES PASS_REGULAR_EXPRESSION "Nexus 1.1.0")
         add_test(NAME lic_nexus_rules_check
             COMMAND lic_nexus check "${CMAKE_CURRENT_SOURCE_DIR}/examples/nexus/GameRules.nx")
+        add_test(NAME lic_nexus_scene_api_check
+            COMMAND lic_nexus check "${CMAKE_CURRENT_SOURCE_DIR}/examples/nexus/SceneApiDemo.nx")
         if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
             set(LIC_NEXUS_RULES_SMOKE "${CMAKE_CURRENT_BINARY_DIR}/nexus-game-rules-smoke${CMAKE_EXECUTABLE_SUFFIX}")
             add_test(NAME lic_nexus_rules_build
@@ -274,6 +278,15 @@ if(BUILD_TESTING AND LIC_ENGINE_BUILD_TESTS)
             set_tests_properties(lic_nexus_rules_run PROPERTIES
                 DEPENDS lic_nexus_rules_build
                 PASS_REGULAR_EXPRESSION "LICCFG_PLAYER_HEALTH=100")
+            set(LIC_NEXUS_SCENE_API_SMOKE "${CMAKE_CURRENT_BINARY_DIR}/nexus-scene-api-smoke${CMAKE_EXECUTABLE_SUFFIX}")
+            add_test(NAME lic_nexus_scene_api_build
+                COMMAND lic_nexus build
+                    "${CMAKE_CURRENT_SOURCE_DIR}/examples/nexus/SceneApiDemo.nx"
+                    -o "${LIC_NEXUS_SCENE_API_SMOKE}" --backend native)
+            add_test(NAME lic_nexus_scene_api_run COMMAND "${LIC_NEXUS_SCENE_API_SMOKE}")
+            set_tests_properties(lic_nexus_scene_api_run PROPERTIES
+                DEPENDS lic_nexus_scene_api_build
+                PASS_REGULAR_EXPRESSION "LICAPI SPAWN_BOX 100")
         endif()
     endif()
     add_executable(lic_core_tests tests/core_tests.cpp)
