@@ -349,6 +349,7 @@ void test_nexus_scene_api() {
         "LICCFG_PLAYER_HEALTH=100\n"
         "LICAPI SPAWN_BOX 41 100 50 -200 100 1000 500 0\n"
         "LICAPI SET_POSITION 41 200 50 0\n"
+        "LICAPI MOVE_BY 41 50 0 -50\n"
         "LICAPI SET_ROTATION 41 0 90 0\n"
         "LICAPI SET_SCALE 41 100 200 300\n"
         "LICAPI SET_COLOR 41 100 200 300\n"
@@ -356,7 +357,7 @@ void test_nexus_scene_api() {
         "LICAPI SET_ENABLED 41 0\n"
         "LICAPI SET_POSITION 41 0 0 0; rm -rf /\n";
     const auto result = lic::scripting::apply_scene_commands(output, world);
-    expect(result.commands_applied == 7, "NEXUS API should apply safe entity setup and mutation commands");
+    expect(result.commands_applied == 8, "NEXUS API should apply safe entity setup and mutation commands");
     expect(result.commands_ignored == 1, "NEXUS API should reject malformed commands");
 
     lic::world::Entity entity{};
@@ -365,7 +366,7 @@ void test_nexus_scene_api() {
     });
     expect(world.alive(entity), "NEXUS SPAWN_BOX should create an ECS mesh node");
     const auto& transform = world.get<lic::world::Transform>(entity);
-    expect(transform.position[0] == 2.0F && transform.position[1] == 0.5F,
+    expect(transform.position[0] == 2.5F && transform.position[1] == 0.5F && transform.position[2] == -0.5F,
            "NEXUS SET_POSITION should modify the ECS transform");
     expect(transform.rotation_degrees[1] == 90.0F, "NEXUS SET_ROTATION should set Euler rotation");
     expect(transform.scale[1] == 2.0F && transform.scale[2] == 3.0F,

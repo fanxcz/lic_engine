@@ -1,5 +1,7 @@
 #include <lic/scripting/scene_api.hpp>
 
+#include <array>
+#include <cmath>
 #include <cstdint>
 #include <sstream>
 #include <string>
@@ -121,6 +123,20 @@ void apply_command(const std::string& command, std::istringstream& input,
     if (command == "SET_POSITION") {
         world.get<lic::world::Transform>(entity).position = {
             static_cast<float>(a) / 100.0F, static_cast<float>(b) / 100.0F, static_cast<float>(c) / 100.0F};
+    } else if (command == "MOVE_BY") {
+        auto& position = world.get<lic::world::Transform>(entity).position;
+        const std::array<float, 3> delta{static_cast<float>(a) / 100.0F,
+                                         static_cast<float>(b) / 100.0F,
+                                         static_cast<float>(c) / 100.0F};
+        for (std::size_t axis = 0; axis < 3; ++axis) {
+            const float candidate = position[axis] + delta[axis];
+            if (!std::isfinite(candidate) || candidate < -10000.0F || candidate > 10000.0F) {
+                result.messages.emplace_back("NEXUS API: MOVE_BY would exceed world coordinate limits");
+                ++result.commands_ignored;
+                return;
+            }
+        }
+        for (std::size_t axis = 0; axis < 3; ++axis) position[axis] += delta[axis];
     } else if (command == "SET_ROTATION") {
         if (a < -360 || a > 360 || b < -360 || b > 360 || c < -360 || c > 360) {
             result.messages.emplace_back("NEXUS API: rotation must be between -360 and 360 degrees");

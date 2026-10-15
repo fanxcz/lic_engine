@@ -57,6 +57,7 @@ target_link_libraries(lic_game PUBLIC LIC::World lic_build_options)
 
 add_library(lic_scripting
     engine/scripting/src/process.cpp
+    engine/scripting/src/runtime_session.cpp
     engine/scripting/src/scene_api.cpp)
 add_library(LIC::Scripting ALIAS lic_scripting)
 target_include_directories(lic_scripting PUBLIC engine/scripting/include)
@@ -287,6 +288,17 @@ if(BUILD_TESTING AND LIC_ENGINE_BUILD_TESTS)
             set_tests_properties(lic_nexus_scene_api_run PROPERTIES
                 DEPENDS lic_nexus_scene_api_build
                 PASS_REGULAR_EXPRESSION "LICAPI SPAWN_BOX 100")
+            set(LIC_NEXUS_RUNTIME_SMOKE "${CMAKE_CURRENT_BINARY_DIR}/nexus-runtime-smoke${CMAKE_EXECUTABLE_SUFFIX}")
+            add_test(NAME lic_nexus_runtime_build
+                COMMAND lic_nexus build
+                    "${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts/GameRuntime.nx"
+                    -o "${LIC_NEXUS_RUNTIME_SMOKE}" --backend native)
+            add_executable(lic_runtime_session_tests tests/runtime_session_tests.cpp)
+            target_link_libraries(lic_runtime_session_tests PRIVATE LIC::Scripting LIC::World lic_build_options)
+            add_test(NAME lic_runtime_session_tests
+                COMMAND lic_runtime_session_tests "${LIC_NEXUS_RUNTIME_SMOKE}"
+                    "${CMAKE_CURRENT_BINARY_DIR}/lic-runtime-session-test.log")
+            set_tests_properties(lic_runtime_session_tests PROPERTIES DEPENDS lic_nexus_runtime_build)
         endif()
     endif()
     add_executable(lic_core_tests tests/core_tests.cpp)
