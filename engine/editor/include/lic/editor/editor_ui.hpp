@@ -44,6 +44,7 @@ public:
     [[nodiscard]] const lic::world::World& world() const noexcept { return world_; }
     [[nodiscard]] lic::world::World& render_world() noexcept { return game_mode_ ? game_.world() : world_; }
     [[nodiscard]] const lic::world::World& render_world() const noexcept { return game_mode_ ? game_.world() : world_; }
+    [[nodiscard]] const std::filesystem::path& project_root_path() const noexcept { return project_root_; }
     [[nodiscard]] lic::world::Entity selected_entity() const noexcept { return selected_entity_; }
     [[nodiscard]] ViewportRect viewport_rect() const noexcept { return viewport_rect_; }
     [[nodiscard]] float camera_yaw() const noexcept;
@@ -67,6 +68,7 @@ private:
     ViewportRect viewport_rect_{};
     std::vector<std::string> console_messages_;
     std::array<char, 32768> nexus_script_buffer_{};
+    std::array<char, 1024> model_import_path_{};
     std::array<lic::world::MaterialResource, 5> game_materials_{};
     std::string nexus_output_;
     std::string nexus_status_{"NEXUS rules not loaded"};
@@ -84,6 +86,7 @@ private:
     bool game_dash_was_down_{};
     bool nexus_script_loaded_{};
     bool show_nexus_panel_{};
+    bool show_model_import_dialog_{};
     float camera_yaw_{0.68F};
     float camera_pitch_{0.38F};
     float camera_zoom_{1.0F};
@@ -100,6 +103,8 @@ private:
     void load_scene();
     void request_new_scene();
     void add_node(lic::world::NodeKind kind);
+    void import_model_from_path();
+    void draw_model_import_dialog();
     void duplicate_selected();
     void delete_selected();
     void toggle_play();

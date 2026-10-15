@@ -1,4 +1,5 @@
 #include <lic/editor/editor_ui.hpp>
+#include <lic/assets/gltf.hpp>
 
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_vulkan.h>
@@ -15,6 +16,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <cctype>
 #include <stdexcept>
 #include <string>
 #include <system_error>
@@ -387,6 +389,116 @@ void EditorUi::add_node(lic::world::NodeKind kind) {
     log("Added " + std::string(lic::world::node_kind_name(kind)));
 }
 
+void EditorUi::import_model_from_path() {
+    const std::string entered = model_import_path_.data();
+    if (entered.empty()) {
+        status_message_ = "Enter a .gltf or .glb file path";
+        return;
+    }
+
+    std::filesystem::path source = std::filesystem::u8path(entered);
+    std::error_code error;
+    source = std::filesystem::absolute(source, error).lexically_normal();
+    if (error || !std::filesystem::is_regular_file(source, error)) {
+        status_message_ = "Model file not found";
+        log("Import failed: selected model file does not exist");
+        return;
+    }
+
+    std::filesystem::path destinationFolder;
+    try {
+        if (!lic::assets::is_gltf_path(source)) {
+            throw std::runtime_error("Only glTF 2.0 (.gltf) and GLB (.glb) files are supported");
+        }
+        // Parse before copying so malformed models never become project assets.
+        const auto sourceAsset = lic::assets::load_gltf(source);
+        const auto dependencies = lic::assets::gltf_external_dependencies(source);
+
+        std::string stem = source.stem().string();
+        for (char& c : stem) {
+            const auto u = static_cast<unsigned char>(c);
+            if (!(std::isalnum(u) || c == '-' || c == '_')) c = '_';
+        }
+        while (!stem.empty() && (stem.front() == '_' || stem.front() == '.')) stem.erase(stem.begin());
+        if (stem.empty()) stem = "Model";
+
+        const auto modelsFolder = project_root_ / "Assets" / "Models";
+        std::filesystem::create_directories(modelsFolder);
+        destinationFolder = modelsFolder / stem;
+        for (std::size_t suffix = 2; std::filesystem::exists(destinationFolder); ++suffix) {
+            destinationFolder = modelsFolder / (stem + "_" + std::to_string(suffix));
+        }
+        std::filesystem::create_directories(destinationFolder);
+
+        const auto destinationModel = destinationFolder / source.filename();
+        std::filesystem::copy_file(source, destinationModel, std::filesystem::copy_options::none);
+
+        for (const auto& dependency : dependencies) {
+            const auto from = source.parent_path() / dependency;
+            const auto to = destinationFolder / dependency;
+            if (!std::filesystem::is_regular_file(from)) {
+                throw std::runtime_error("Required model resource is missing: " + from.string());
+            }
+            std::filesystem::create_directories(to.parent_path());
+            std::filesystem::copy_file(from, to, std::filesystem::copy_options::none);
+        }
+
+        const auto copiedAsset = lic::assets::load_gltf(destinationModel);
+        (void)copiedAsset;
+        const auto relative = std::filesystem::relative(destinationModel, project_root_).generic_string();
+        if (!lic::world::is_safe_mesh_reference(relative)) {
+            throw std::runtime_error("Imported model path could not be represented safely inside the project");
+        }
+
+        lic::world::Transform transform;
+        transform.scale = {1.0F, 1.0F, 1.0F};
+        lic::world::Appearance tint;
+        tint.color = {1.0F, 1.0F, 1.0F, 1.0F};
+        const auto entity = lic::world::create_node(
+            world_, lic::world::NodeKind::MeshInstance3D, sourceAsset.name, transform, tint);
+        world_.emplace<lic::world::MeshResourceReference>(entity,
+            lic::world::MeshResourceReference{relative});
+        selected_entity_ = entity;
+        mark_dirty();
+        status_message_ = "Imported " + source.filename().string();
+        log("Imported " + source.filename().string() + " (" +
+            std::to_string(sourceAsset.vertices.size()) + " vertices, " +
+            std::to_string(sourceAsset.primitives.size()) + " primitives)");
+        model_import_path_.fill('\0');
+    } catch (const std::exception& exception) {
+        if (!destinationFolder.empty()) {
+            std::error_code ignored;
+            std::filesystem::remove_all(destinationFolder, ignored);
+        }
+        status_message_ = "Model import failed";
+        log(std::string("Model import failed: ") + exception.what());
+    }
+}
+
+void EditorUi::draw_model_import_dialog() {
+    if (show_model_import_dialog_) {
+        ImGui::OpenPopup("Import glTF / GLB");
+        show_model_import_dialog_ = false;
+    }
+    ImGui::SetNextWindowSize(ImVec2(620.0F, 185.0F), ImGuiCond_Appearing);
+    if (!ImGui::BeginPopupModal("Import glTF / GLB", nullptr,
+        ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) return;
+
+    ImGui::TextWrapped("Import a glTF 2.0 or GLB model. The model and its local buffers/images are copied into this project's Assets/Models folder.");
+    ImGui::Spacing();
+    ImGui::SetNextItemWidth(-1.0F);
+    ImGui::InputText("Source file", model_import_path_.data(), model_import_path_.size());
+    ImGui::TextDisabled("Paste a full path. Supported geometry: triangle lists, POSITION, NORMAL, TEXCOORD_0 and material factors.");
+    ImGui::Spacing();
+    if (ImGui::Button("Import", ImVec2(100.0F, 0.0F))) {
+        import_model_from_path();
+        if (status_message_.find("Imported ") == 0) ImGui::CloseCurrentPopup();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel", ImVec2(100.0F, 0.0F))) ImGui::CloseCurrentPopup();
+    ImGui::EndPopup();
+}
+
 void EditorUi::duplicate_selected() {
     if (!world_.alive(selected_entity_) || !world_.has<lic::world::NodeName>(selected_entity_)) return;
     const auto name = world_.get<lic::world::NodeName>(selected_entity_).value + " Copy";
@@ -490,6 +602,7 @@ void EditorUi::build_frame(float delta_seconds) {
 
     draw_scene_canvas();
     draw_toolbar();
+    draw_model_import_dialog();
     draw_hierarchy();
     draw_inspector();
     draw_bottom_panel();
@@ -516,6 +629,8 @@ void EditorUi::draw_toolbar() {
     if (ImGui::Button("Save  Ctrl+S")) save_scene();
     ImGui::SameLine();
     if (ImGui::Button("Load")) load_scene();
+    ImGui::SameLine();
+    if (ImGui::Button("Import Model")) show_model_import_dialog_ = true;
     ImGui::SameLine();
     if (ImGui::Button("+ Add Node")) ImGui::OpenPopup("AddNodeToolbar");
     if (ImGui::BeginPopup("AddNodeToolbar")) {
