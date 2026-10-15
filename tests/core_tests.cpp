@@ -1,7 +1,11 @@
+#include <lic/assets/gltf.hpp>
 #include <lic/core/version.hpp>
 #include <lic/game/voidbound.hpp>
 #include <lic/world/scene.hpp>
 
+#include <array>
+#include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -259,6 +263,85 @@ void test_material_resources() {
     std::filesystem::remove_all(folder, ignored);
 }
 
+void test_mesh_reference_scene_roundtrip() {
+    const auto folder = std::filesystem::temp_directory_path() / "lic-engine-mesh-reference-tests";
+    const auto path = folder / "model-reference.licscene";
+    std::error_code ignored;
+    std::filesystem::remove_all(folder, ignored);
+    lic::world::World world;
+    const auto entity = lic::world::create_node(world, lic::world::NodeKind::MeshInstance3D, "Imported triangle");
+    world.emplace<lic::world::MeshResourceReference>(entity,
+        lic::world::MeshResourceReference{"Assets/Models/Triangle.gltf"});
+    lic::world::save_scene(world, path);
+    lic::world::World loaded;
+    lic::world::load_scene(loaded, path);
+    bool found = false;
+    loaded.each<lic::world::MeshResourceReference>([&](lic::world::Entity loadedEntity,
+                                                         const lic::world::MeshResourceReference& mesh) {
+        found = loaded.get<lic::world::NodeName>(loadedEntity).value == "Imported triangle" &&
+                mesh.path == "Assets/Models/Triangle.gltf";
+    });
+    expect(found, "LICSCENE v3 should preserve project-relative model references");
+    expect(!lic::world::is_safe_mesh_reference("../secret.glb"), "model path traversal must be rejected");
+    expect(!lic::world::is_safe_mesh_reference("C:/outside/model.gltf"), "absolute model paths must be rejected");
+    expect(lic::world::is_safe_mesh_reference("Assets/Models/Triangle.gltf"), "relative glTF paths should be accepted");
+    std::filesystem::remove_all(folder, ignored);
+}
+
+void test_gltf_import() {
+    const auto folder = std::filesystem::temp_directory_path() / "lic-engine-gltf-tests";
+    const auto modelPath = folder / "Triangle.gltf";
+    const auto bufferPath = folder / "Triangle.bin";
+    std::error_code ignored;
+    std::filesystem::remove_all(folder, ignored);
+    std::filesystem::create_directories(folder);
+    const std::array<float, 9> positions{
+        -0.5F, 0.0F, 0.0F, 0.5F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F
+    };
+    const std::array<std::uint16_t, 4> indices{0, 1, 2, 0};
+    {
+        std::ofstream binary(bufferPath, std::ios::binary | std::ios::trunc);
+        binary.write(reinterpret_cast<const char*>(positions.data()),
+                     static_cast<std::streamsize>(sizeof(positions)));
+        binary.write(reinterpret_cast<const char*>(indices.data()),
+                     static_cast<std::streamsize>(sizeof(indices)));
+    }
+    {
+        std::ofstream json(modelPath, std::ios::binary | std::ios::trunc);
+        json << R"JSON({
+          "asset":{"version":"2.0","generator":"LIC Engine tests"},
+          "scene":0,
+          "scenes":[{"nodes":[0]}],
+          "nodes":[{"mesh":0}],
+          "meshes":[{"name":"Triangle","primitives":[{"attributes":{"POSITION":0},"indices":1,"material":0,"mode":4}]}],
+          "materials":[{"name":"Rift","pbrMetallicRoughness":{"baseColorFactor":[0.2,0.6,0.9,1.0],
+             "metallicFactor":0.35,"roughnessFactor":0.28}}],
+          "buffers":[{"uri":"Triangle.bin","byteLength":44}],
+          "bufferViews":[{"buffer":0,"byteOffset":0,"byteLength":36},
+                          {"buffer":0,"byteOffset":36,"byteLength":8}],
+          "accessors":[{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3",
+             "min":[-0.5,0,0],"max":[0.5,1,0]},
+                       {"bufferView":1,"componentType":5123,"count":3,"type":"SCALAR"}]
+        })JSON";
+    }
+    const auto deps = lic::assets::gltf_external_dependencies(modelPath);
+    expect(deps.size() == 1 && deps[0] == std::filesystem::path("Triangle.bin"),
+           "glTF dependencies should include a local binary buffer");
+    const auto asset = lic::assets::load_gltf(modelPath);
+    expect(asset.name == "Triangle", "glTF importer should take its name from the file stem");
+    expect(asset.vertices.size() == 3, "glTF importer should decode vertex positions");
+    expect(asset.indices.size() == 3, "glTF importer should decode indices");
+    expect(asset.primitives.size() == 1, "glTF importer should keep primitive boundaries");
+    expect(asset.primitives[0].material_name == "Rift", "glTF importer should preserve material names");
+    expect(std::abs(asset.primitives[0].surface.color[1] - 0.6F) < 0.0001F,
+           "glTF importer should read base color factors");
+    expect(std::abs(asset.primitives[0].surface.metallic - 0.35F) < 0.0001F,
+           "glTF importer should read metallic factors");
+    expect(std::abs(asset.primitives[0].surface.roughness - 0.28F) < 0.0001F,
+           "glTF importer should read roughness factors");
+    std::filesystem::remove_all(folder, ignored);
+}
+
 void test_voidbound_gameplay() {
     lic::game::Voidbound game;
     expect(game.state() == lic::game::RunState::Menu, "Voidbound should open to a main menu");
@@ -294,6 +377,8 @@ int main() {
     test_scene_serialization();
     test_legacy_scene_compatibility();
     test_material_resources();
+    test_mesh_reference_scene_roundtrip();
+    test_gltf_import();
     test_gameplay_settings_validation();
     test_voidbound_gameplay();
     std::cout << "LIC Engine core, world, scenes, materials, NEXUS settings and gameplay tests passed.\n";
