@@ -390,10 +390,10 @@ RuntimeSessionReply RuntimeSession::start(
     impl_->running = true;
 #endif
     std::string output;
-    const auto startup = impl_->wait_for_marker(kFrameEnd, startup_timeout, output);
-    if (!startup.ok) {
+    const auto startupReply = impl_->wait_for_marker(kFrameEnd, startup_timeout, output);
+    if (!startupReply.ok) {
         impl_->terminate();
-        return failure(startup.error, std::move(output));
+        return failure(startupReply.error, std::move(output));
     }
     return RuntimeSessionReply{true, std::move(output), {}};
 }
